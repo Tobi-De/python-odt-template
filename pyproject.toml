@@ -38,6 +38,9 @@ dependencies = [
 optional-dependencies.django = [
   "django>=3",
 ]
+optional-dependencies.jinja = [
+  "jinja2",
+]
 urls.Documentation = "https://github.com/Tobi-De/python-odt-template#readme"
 urls.Issues = "https://github.com/Tobi-De/python-odt-template/issues"
 urls.Source = "https://github.com/Tobi-De/python-odt-template"
@@ -48,9 +51,11 @@ path = "src/python_odt_template/__about__.py"
 [tool.hatch.envs.default]
 features = [
   "django",
+  "jinja",
 ]
 dependencies = [
   "ipython",
+  "markdown2"
 ]
 
 [tool.hatch.envs.types]
