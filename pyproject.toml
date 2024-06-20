@@ -1,0 +1,89 @@
+[build-system]
+build-backend = "hatchling.build"
+
+requires = [
+  "hatchling",
+]
+
+[project]
+name = "python-odt-template"
+description = ""
+readme = "README.md"
+keywords = [
+]
+license = "MIT"
+authors = [
+  { name = "Tobi DEGNON", email = "tobidegnon@proton.me" },
+]
+requires-python = ">=3.8"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dynamic = [
+  "version",
+]
+dependencies = [
+  "odfdo",
+]
+
+optional-dependencies.django = [
+  "django>=3",
+]
+urls.Documentation = "https://github.com/Tobi-De/python-odt-template#readme"
+urls.Issues = "https://github.com/Tobi-De/python-odt-template/issues"
+urls.Source = "https://github.com/Tobi-De/python-odt-template"
+
+[tool.hatch.version]
+path = "src/python_odt_template/__about__.py"
+
+[tool.hatch.envs.default]
+features = [
+  "django",
+]
+dependencies = [
+  "ipython",
+]
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/python_odt_template tests}"
+
+[tool.coverage.run]
+source_pkgs = [
+  "python_odt_template",
+  "tests",
+]
+branch = true
+parallel = true
+omit = [
+  "src/python_odt_template/__about__.py",
+]
+
+[tool.coverage.paths]
+python_odt_template = [
+  "src/python_odt_template",
+  "*/python-odt-template/src/python_odt_template",
+]
+tests = [
+  "tests",
+  "*/python-odt-template/tests",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
