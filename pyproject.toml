@@ -10,6 +10,7 @@ name = "python-odt-template"
 description = ""
 readme = "README.md"
 keywords = [
+  "odt", "libreoffice", "open-document-text", "django", "jinja2",
 ]
 license = "MIT"
 authors = [
@@ -31,9 +32,7 @@ classifiers = [
 dynamic = [
   "version",
 ]
-dependencies = [
-  "odfdo",
-]
+dependencies = ["markdown2"]
 
 optional-dependencies.django = [
   "django>=3",

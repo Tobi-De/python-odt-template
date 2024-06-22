@@ -5,16 +5,23 @@
 
 -----
 
+> [!IMPORTANT]
+> This package currently contains minimal features and is a work-in-progress
+
 ## Table of Contents
 
 - [Installation](#installation)
 - [License](#license)
+- [Credits](#credits)
 
 ## Installation
 
 ```console
 pip install python-odt-template
 ```
+## Credits
+
+Thanks to [secretary](https://github.com/christopher-ramirez/secretary) for the enormous amount of integration work on Jinja2 and ODT.
 
 ## License
 

@@ -17,6 +17,7 @@ class LibreOfficeError(Exception):
 
 def libreoffice(*args, raise_on_error=False) -> None:
     exec_name = "/Applications/LibreOffice.app/Contents/MacOS/soffice" if platform.system() == "Darwin" else "soffice"
+    logger.debug(f"Running LibreOffice with args: {args}")
     process = subprocess.run(
         [exec_name, "--headless", *args],
         check=False,

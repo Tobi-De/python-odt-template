@@ -1,3 +1,6 @@
+@bootstrap:
+    hatch env create
+
 @install:
     hatch run python --version
 
@@ -8,3 +11,6 @@
     hatch fmt --formatter
     pre-commit run --all-files pyproject-fmt
     pre-commit run --all-files reorder-python-imports
+
+@dj:
+    cd example && hatch run python manage.py
