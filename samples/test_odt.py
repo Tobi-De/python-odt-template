@@ -4,6 +4,7 @@ from pathlib import Path
 from python_odt_template import ODTTemplate
 from python_odt_template.jinja import enable_markdown
 from python_odt_template.jinja import get_odt_renderer
+from python_odt_template.libreoffice import convert_to_pdf
 
 odt_renderer = get_odt_renderer(media_path="inputs")
 
@@ -45,7 +46,9 @@ with ODTTemplate("inputs/template.odt") as template:
     template.pack(
         "template_rendered.odt",
     )
+    convert_to_pdf("template_rendered.odt", "outputs")
 
 with ODTTemplate("inputs/checkin.odt") as template:
     odt_renderer.render(template, {"value": "Something"})
     template.pack("checkin_rendered.odt")
+    convert_to_pdf("checkin_rendered.odt", "outputs")

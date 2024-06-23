@@ -11,8 +11,10 @@
 ## Table of Contents
 
 - [Installation](#installation)
-- [License](#license)
+- [Usage](#usage)
+- [Alternatives](#alternatives)
 - [Credits](#credits)
+- [License](#license)
 
 ## Installation
 
@@ -26,6 +28,7 @@ pip install python-odt-template
 from python_odt_template import ODTTemplate
 from python_odt_template.jinja import enable_markdown
 from python_odt_template.jinja import get_odt_renderer
+from python_odt_template.libreoffice import convert_to_pdf
 
 odt_renderer = get_odt_renderer(media_path="inputs")
 
@@ -35,7 +38,12 @@ with ODTTemplate("inputs/simple_template.odt") as template, enable_markdown(temp
         context={"document": document, "countries": countries},
     )
     template.pack("simple_template_rendered.odt")
+    convert_to_pdf("simple_template_rendered.odt", "outputs")
 ```
+
+## Alternatives
+
+- [python-docx-template](https://github.com/elapouya/python-docx-template)
 
 ## Credits
 
