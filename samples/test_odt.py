@@ -3,10 +3,9 @@ from pathlib import Path
 
 from python_odt_template import ODTTemplate
 from python_odt_template.jinja import enable_markdown
-from python_odt_template.jinja import environment
 from python_odt_template.jinja import get_odt_renderer
 
-odt_renderer = get_odt_renderer("inputs")
+odt_renderer = get_odt_renderer(media_path="inputs")
 
 document = {
     "datetime": dt.datetime.now(),
