@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import os
-from xml.dom.minidom import getDOMImplementation
 from unittest import TestCase
-from secretary import UndefinedSilently, pad_string, Renderer
+from xml.dom.minidom import getDOMImplementation
+
+from secretary import Renderer, UndefinedSilently, pad_string
+
 
 def test_undefined_silently():
     undefined = UndefinedSilently()

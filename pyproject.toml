@@ -10,7 +10,11 @@ name = "python-odt-template"
 description = ""
 readme = "README.md"
 keywords = [
-  "odt", "libreoffice", "open-document-text", "django", "jinja2",
+  "django",
+  "jinja2",
+  "libreoffice",
+  "odt",
+  "open-document-text",
 ]
 license = "MIT"
 authors = [
@@ -32,7 +36,9 @@ classifiers = [
 dynamic = [
   "version",
 ]
-dependencies = ["markdown2"]
+dependencies = [
+  "markdown2",
+]
 
 optional-dependencies.django = [
   "django>=3",
@@ -54,7 +60,7 @@ features = [
 ]
 dependencies = [
   "ipython",
-  "markdown2"
+  "markdown2",
 ]
 
 [tool.hatch.envs.types]

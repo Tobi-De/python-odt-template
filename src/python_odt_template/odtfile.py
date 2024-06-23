@@ -1,9 +1,9 @@
+import io
 import logging
 import zipfile
-from pathlib import Path
-import io
+from mimetypes import guess_extension, guess_type
 from os import path
-from mimetypes import  guess_extension
+from pathlib import Path
 from xml.dom.minidom import parseString
 
 logger = logging.getLogger("python_odt_template")
@@ -19,31 +19,18 @@ class ODTFile:
         self.styles = parseString(self.files["styles.xml"])
         self.manifest = parseString(self.files["META-INF/manifest.xml"])
 
-    def add_media_to_archive(self, media, mime, name=""):
-        """
-        Adds to "Pictures" archive folder the file in `media` and register
-        it into manifest file.
-        """
-        extension = None
-        if hasattr(media, "name") and not name:
-            extension = path.splitext(media.name)
-            name = extension[0]
-            extension = extension[1]
+    def add_image(self, filepath: Path, name: str) -> str:
+        file_type = guess_type(filepath)
+        mime = file_type[0] if file_type[0] else "image/png"  # FIXME
+        extension = filepath.suffix if filepath.suffix else guess_extension(mime)
 
-        if not extension:
-            extension = guess_extension(mime)
-
-        media_path = "Pictures/%s%s" % (name, extension)
-        media.seek(0)
-        self.files[media_path] = media.read(-1)
-        if hasattr(media, "close"):
-            media.close()
+        media_path = f"Pictures/{name}{extension}"
+        self.files[media_path] = filepath.read_bytes()
 
         files_node = self.manifest.getElementsByTagName("manifest:manifest")[0]
         node = self.create_node(self.manifest, "manifest:file-entry", files_node)
         node.setAttribute("manifest:full-path", media_path)
         node.setAttribute("manifest:media-type", mime)
-
         return media_path
 
     @classmethod

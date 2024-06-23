@@ -1,8 +1,8 @@
-from uuid import uuid4
-from xml.dom.minidom import parseString, Document
-from markdown2 import markdown
 import re
+from uuid import uuid4
+from xml.dom.minidom import Document, parseString
 
+from markdown2 import markdown
 from markupsafe import Markup
 
 from python_odt_template.markdown_map import transform_map
@@ -30,7 +30,7 @@ def get_markdown_filter(content: Document):
 
             for style_node in auto_styles.childNodes:
                 if style_node.hasAttribute("style:name") and (
-                    style_node.getAttribute("style:name") == style_name
+                        style_node.getAttribute("style:name") == style_name
                 ):
                     return style_node
 
@@ -102,7 +102,7 @@ def get_markdown_filter(content: Document):
                             else:
                                 container = xml_object.createElement("text:span")
                                 for text in re.split(
-                                    "(\n)", node.nodeValue.lstrip("\n")
+                                        "(\n)", node.nodeValue.lstrip("\n")
                                 ):
                                     if text == "\n":
                                         container.appendChild(
@@ -143,7 +143,7 @@ def get_markdown_filter(content: Document):
                 # Does the node need to create an style?
                 if "style" in transform_map[tag]:
                     name = transform_map[tag]["style"]["name"]
-                    if not name in styles_cache:
+                    if name not in styles_cache:
                         style_node = get_style_by_name(name)
 
                         if style_node is None:
@@ -170,28 +170,9 @@ def get_markdown_filter(content: Document):
     return markdown_filter
 
 
-# def media_loader(f):
-#     def wrapper(*args, **kwargs):
-#         Renderer.__media_loader__ = f
-#
-#     return wrapper
-
-
 def pad_string(value, length=5):
     value = str(value)
     return value.zfill(length)
-
-
-def get_image_filter(obj):
-    def image_filter(value, *args, **kwargs):
-        """Store value into template_images and return the key name where this
-        method stored it. The value returned it later used to load the image
-        from media loader and finally inserted into the final ODT document."""
-        key = uuid4().hex
-        obj.template_images[key] = {"value": value, "args": args, "kwargs": kwargs}
-
-        return key
-    return image_filter
 
 
 def finalize_value(value):
