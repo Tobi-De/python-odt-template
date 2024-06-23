@@ -1,9 +1,11 @@
+from contextlib import contextmanager
 from pathlib import Path
 
-from jinja2 import Environment, Undefined
+from jinja2 import Environment
+from jinja2 import Undefined
 from markupsafe import Markup
-
-from python_odt_template.filters import finalize_value, pad_string
+from python_odt_template.filters import finalize_value
+from python_odt_template.filters import pad_string
 from python_odt_template.renderer import ODTRenderer
 
 
@@ -48,3 +50,12 @@ def get_odt_renderer(media_path: str | Path, env: Environment = environment):
         render_func=render,
     )
     return odt_renderer
+
+
+@contextmanager
+def enable_markdown(markdown_filter: callable, env: Environment = environment):
+    try:
+        env.filters["markdown"] = markdown_filter
+        yield
+    finally:
+        env.filters.pop("markdown")

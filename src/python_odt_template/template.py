@@ -1,14 +1,17 @@
 import io
 import logging
+import os
 import re
+import shutil
+import tempfile
 import zipfile
-from mimetypes import guess_extension, guess_type
+from mimetypes import guess_extension
+from mimetypes import guess_type
 from pathlib import Path
 from xml.dom.minidom import parseString
 
 from markdown2 import markdown
 from markupsafe import Markup
-
 from python_odt_template.markdown_map import transform_map
 
 basestring = (str, bytes)
@@ -16,15 +19,24 @@ basestring = (str, bytes)
 logger = logging.getLogger("python_odt_template")
 
 
-class ODTFile:
+class ODTTemplate:
     """An abstraction over an ODT file."""
 
     def __init__(self, file_path: Path | str):
-        self.file_path = Path(file_path)
-        self.files = self.unpack_template(file_path)
-        self.content = parseString(self.files["content.xml"])
-        self.styles = parseString(self.files["styles.xml"])
-        self.manifest = parseString(self.files["META-INF/manifest.xml"])
+        self.file_path = file_path
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.unpack()
+        self.content = parseString(self.read_file("content.xml"))
+        self.styles = parseString(self.read_file("styles.xml"))
+        self.manifest = parseString(self.read_file("META-INF/manifest.xml"))
+
+    def write_file(self, name: str, content: str) -> None:
+        with open(self.temp_dir.name + "/" + name, "w") as file:
+            file.write(content)
+
+    def read_file(self, name: str) -> str:
+        with open(self.temp_dir.name + "/" + name, "r") as file:
+            return file.read()
 
     def add_image(self, filepath: Path, name: str) -> str:
         file_type = guess_type(filepath)
@@ -32,7 +44,7 @@ class ODTFile:
         extension = filepath.suffix if filepath.suffix else guess_extension(mime)
 
         media_path = f"Pictures/{name}{extension}"
-        self.files[media_path] = filepath.read_bytes()
+        shutil.copy(filepath, self.temp_dir.name + "/" + media_path)
 
         files_node = self.manifest.getElementsByTagName("manifest:manifest")[0]
         node = self.manifest.createElement("manifest:file-entry")
@@ -42,42 +54,30 @@ class ODTFile:
         node.setAttribute("manifest:media-type", mime)
         return media_path
 
-    @classmethod
-    def unpack_template(cls, template: Path) -> dict:
-        # And Open/libreOffice is just a ZIP file. Here we unarchive the file
-        # and return a dict with every file in the archive
+    def unpack(self) -> None:
         logger.debug("Unpacking template file")
+        with zipfile.ZipFile(self.file_path, "r") as archive:
+            archive.extractall(path=self.temp_dir.name)
 
-        archive_files = {}
-        archive = zipfile.ZipFile(template, "r")
-        for zfile in archive.filelist:
-            archive_files[zfile.filename] = archive.read(zfile.filename)
-
-        return archive_files
-
-    @classmethod
-    def pack_document(cls, files: dict) -> io.BytesIO:
-        # Store to a zip files in files
+    def pack(self, target: str | Path) -> None:
         logger.debug("packing document")
         zip_file = io.BytesIO()
 
-        mimetype = files["mimetype"]
-        del files["mimetype"]
-
-        zipdoc = zipfile.ZipFile(zip_file, "a", zipfile.ZIP_DEFLATED)
-
-        # Store mimetype without without compression using a ZipInfo object
-        # for compatibility with Py2.6 which doesn't have compress_type
-        # parameter in ZipFile.writestr function
-        mime_zipinfo = zipfile.ZipInfo("mimetype")
-        zipdoc.writestr(mime_zipinfo, mimetype)
-
-        for fname, content in files.items():
-            zipdoc.writestr(fname, content)
-
+        with zipfile.ZipFile(zip_file, "w", zipfile.ZIP_DEFLATED) as zipdoc:
+            for root, dirs, files in os.walk(self.temp_dir.name):
+                for file in files:
+                    zipdoc.write(
+                        os.path.join(root, file),
+                        arcname=os.path.relpath(os.path.join(root, file), self.temp_dir.name),
+                    )
+        Path(target).write_bytes(zip_file.getvalue())
         logger.debug("Document packing completed")
 
-        return zip_file
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.temp_dir.cleanup()
 
     def get_markdown_filter(self):
         def markdown_filter(markdown_text):
@@ -98,9 +98,7 @@ class ODTFile:
                     return None
 
                 for style_node in auto_styles.childNodes:
-                    if style_node.hasAttribute("style:name") and (
-                            style_node.getAttribute("style:name") == style_name
-                    ):
+                    if style_node.hasAttribute("style:name") and (style_node.getAttribute("style:name") == style_name):
                         return style_node
 
                 return None
@@ -170,17 +168,11 @@ class ODTFile:
                                         traverse_preformated(n)
                                 else:
                                     container = xml_object.createElement("text:span")
-                                    for text in re.split(
-                                            "(\n)", node.nodeValue.lstrip("\n")
-                                    ):
+                                    for text in re.split("(\n)", node.nodeValue.lstrip("\n")):
                                         if text == "\n":
-                                            container.appendChild(
-                                                xml_object.createElement("text:line-break")
-                                            )
+                                            container.appendChild(xml_object.createElement("text:line-break"))
                                         else:
-                                            container.appendChild(
-                                                xml_object.createTextNode(text)
-                                            )
+                                            container.appendChild(xml_object.createTextNode(text))
 
                                     node.parentNode.replaceChild(container, node)
 
@@ -205,9 +197,7 @@ class ODTFile:
                         # copy original href attribute in <a> tag
                         if tag == "a":
                             if html_node.hasAttribute("href"):
-                                odt_node.setAttribute(
-                                    "xlink:href", html_node.getAttribute("href")
-                                )
+                                odt_node.setAttribute("xlink:href", html_node.getAttribute("href"))
 
                     # Does the node need to create an style?
                     if "style" in transform_map[tag]:
@@ -220,7 +210,7 @@ class ODTFile:
                                 style_node = insert_style_in_content(
                                     name,
                                     transform_map[tag]["style"].get("attributes", None),
-                                    **transform_map[tag]["style"]["properties"]
+                                    **transform_map[tag]["style"]["properties"],
                                 )
                                 styles_cache[name] = style_node
 

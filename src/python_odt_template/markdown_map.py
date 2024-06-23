@@ -71,15 +71,11 @@ transform_map = {
     },
     "ul": {
         "replace_with": "text:list",
-        "attributes": {
-            "xml:id": "list" + str(randint(100000000000000000, 900000000000000000))
-        },
+        "attributes": {"xml:id": "list" + str(randint(100000000000000000, 900000000000000000))},
     },
     "ol": {
         "replace_with": "text:list",
-        "attributes": {
-            "xml:id": "list" + str(randint(100000000000000000, 900000000000000000))
-        },
+        "attributes": {"xml:id": "list" + str(randint(100000000000000000, 900000000000000000))},
     },
     "li": {"replace_with": "text:list-item"},
     "br": {"replace_with": "text:line-break"},

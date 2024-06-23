@@ -1,8 +1,10 @@
 import datetime as dt
 from pathlib import Path
 
-from python_odt_template import ODTFile
-from python_odt_template.jinja import get_odt_renderer, environment
+from python_odt_template import ODTTemplate
+from python_odt_template.jinja import enable_markdown
+from python_odt_template.jinja import environment
+from python_odt_template.jinja import get_odt_renderer
 
 odt_renderer = get_odt_renderer("inputs")
 
@@ -29,21 +31,22 @@ countries = [
     {"country": "Mexico", "capital": "MExico City", "cities": ["puebla", "cancun"]},
 ]
 
-odt_file = ODTFile("inputs/simple_template.odt")
-environment.filters["markdown"] = odt_file.get_markdown_filter()
-odt_renderer.render(
-    src_file=odt_file,
-    target_file="simple_template_rendered.odt",
-    context={"document": document, "countries": countries},
-)
+with ODTTemplate("inputs/simple_template.odt") as template, enable_markdown(template.get_markdown_filter()):
+    odt_renderer.render(
+        template,
+        context={"document": document, "countries": countries},
+    )
+    template.pack("simple_template_rendered.odt")
 
-environment.filters.pop("markdown")
-odt_renderer.render(
-    ODTFile("inputs/template.odt"),
-    "template_rendered.odt",
-    {"image": "writer.png"},
-)
+with ODTTemplate("inputs/template.odt") as template:
+    odt_renderer.render(
+        template,
+        {"image": "writer.png"},
+    )
+    template.pack(
+        "template_rendered.odt",
+    )
 
-odt_renderer.render(
-    ODTFile("inputs/checkin.odt"), "checkin_rendered.odt", {"value": "Something"}
-)
+with ODTTemplate("inputs/checkin.odt") as template:
+    odt_renderer.render(template, {"value": "Something"})
+    template.pack("checkin_rendered.odt")

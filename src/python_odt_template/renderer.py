@@ -4,12 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 from urllib.parse import unquote
-from xml.dom.minidom import Document, parseString
+from xml.dom.minidom import Document
+from xml.dom.minidom import parseString
 from xml.parsers.expat import ExpatError
 
 from markupsafe import Markup
-
-from python_odt_template import ODTFile
+from python_odt_template import ODTTemplate
 
 logger = logging.getLogger("python_odt_template")
 
@@ -52,13 +52,9 @@ class ODTRenderer:
             rf"(?is)^({self.variable_start_string}|{self.block_start_string}).*({self.variable_end_string}|{self.block_end_string})$"
         )
 
-        self.variable_pattern = re.compile(
-            rf"(?is)({self.variable_start_string})(.*)({self.variable_end_string})$"
-        )
+        self.variable_pattern = re.compile(rf"(?is)({self.variable_start_string})(.*)({self.variable_end_string})$")
 
-        self.block_pattern = re.compile(
-            rf"(?is)({self.block_start_string})(.*)({self.block_end_string})$"
-        )
+        self.block_pattern = re.compile(rf"(?is)({self.block_start_string})(.*)({self.block_end_string})$")
 
     def _compile_escape_expressions(self):
         # Compiles escape expressions
@@ -278,9 +274,7 @@ class ODTRenderer:
                 "".join(
                     [
                         match.group(1),
-                        self.variable_pattern.sub(
-                            r"\1 SafeValue(\2) \3", unquote(match.group(2))
-                        ),
+                        self.variable_pattern.sub(r"\1 SafeValue(\2) \3", unquote(match.group(2))),
                         match.group(3),
                     ]
                 )
@@ -321,13 +315,12 @@ class ODTRenderer:
 
         try:
             xml_source = xml_source.encode("ascii", "xmlcharrefreplace")
-            rendered_xml = self.render_func( self._unescape_entities(xml_source.decode("utf-8")), context
-            )
+            rendered_xml = self.render_func(self._unescape_entities(xml_source.decode("utf-8")), context)
             final_xml = parseString(rendered_xml.encode("ascii", "xmlcharrefreplace"))
             return final_xml
         except ExpatError as e:
             # select 400 lines near the error
-            near = xml_source.split("\n")[e.lineno - 1][e.offset - 200: e.offset + 200]
+            near = xml_source.split("\n")[e.lineno - 1][e.offset - 200 : e.offset + 200]
             raise ExpatError(
                 f'ExpatError "ErrorString(e.code)" at line {e.lineno}, column {e.offset}\nNear of: "[...]{near}[...]"'
             ) from e
@@ -342,28 +335,17 @@ class ODTRenderer:
             logger.error(msg)
             raise
 
-    def render(self, src_file: ODTFile, target_file: str | Path, context: dict):
-        rendered_content = self.render_xml(src_file.content, context)
-        self._replace_images(rendered_content, media_writer=src_file.add_image)
-        src_file.content.getElementsByTagName("office:document-content")[0].replaceChild(
+    def render(self, template: ODTTemplate, context: dict) -> None:
+        rendered_content = self.render_xml(template.content, context)
+        self._replace_images(rendered_content, media_writer=template.add_image)
+        template.content.getElementsByTagName("office:document-content")[0].replaceChild(
             rendered_content.getElementsByTagName("office:body")[0],
-            src_file.content.getElementsByTagName("office:body")[0],
+            template.content.getElementsByTagName("office:body")[0],
         )
-        src_file.files["content.xml"] = src_file.content.toxml()
-        # .encode(
-        #     "ascii", "xmlcharrefreplace"
-        # ))
+        template.write_file("content.xml", template.content.toxml())
 
-        src_file.styles = self.render_xml(src_file.styles, context)
-        self._replace_images(src_file.styles, media_writer=src_file.add_image)
-        src_file.files["styles.xml"] = src_file.styles.toxml()
-        # .encode(
-        #     "ascii", "xmlcharrefreplace"
-        # ))
+        template.styles = self.render_xml(template.styles, context)
+        self._replace_images(template.styles, media_writer=template.add_image)
+        template.write_file("styles.xml", template.styles.toxml())
 
-        src_file.files["META-INF/manifest.xml"] = src_file.manifest.toxml().encode(
-            "ascii", "xmlcharrefreplace"
-        )
-
-        document = src_file.pack_document(src_file.files)
-        Path(target_file).write_bytes(document.getvalue())
+        template.write_file("META-INF/manifest.xml", template.manifest.toxml())
