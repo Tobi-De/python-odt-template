@@ -1,6 +1,6 @@
 import logging
 import re
-
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 from urllib.parse import unquote
@@ -8,8 +8,8 @@ from xml.dom.minidom import Document, parseString
 from xml.parsers.expat import ExpatError
 
 from markupsafe import Markup
-from dataclasses import dataclass, field
-import uuid
+
+from python_odt_template import ODTFile
 
 logger = logging.getLogger("python_odt_template")
 
@@ -42,11 +42,6 @@ class ODTRenderer:
     variable_start_string: str
     variable_end_string: str
     render_func: Callable[[str | Path, dict], str]
-    media_writer: Callable[[Path, str], str]
-
-    # media_getter: Callable[[str], Path|None] = lambda *args, **kwargs: None
-    # media_path: str | Path | None = None
-    # template_media: TemplateMedia | None = None
 
     def __post_init__(self):
         self._compile_tags_expressions()
@@ -298,7 +293,7 @@ class ODTRenderer:
 
         return xml_text
 
-    def _replace_images(self, xml_document: Document):
+    def _replace_images(self, xml_document: Document, media_writer: Callable[[Path, str], str]):
         logger.debug("Inserting images")
         frames = xml_document.getElementsByTagName("draw:frame")
 
@@ -313,11 +308,11 @@ class ODTRenderer:
                 continue
 
             image_node = frame.childNodes[0]
-            media_path = self.media_writer(image, image.stem)
+            media_path = media_writer(image, image.stem)
             frame.setAttribute("draw:name", image.stem)
             image_node.setAttribute("xlink:href", media_path)
 
-    def render_xml(self, xml_document: Document, context: dict):
+    def render_xml(self, xml_document: Document, context: dict) -> Document:
         # Prepare the xml object to be processed by jinja2
         logger.debug("Rendering XML object")
 
@@ -326,12 +321,9 @@ class ODTRenderer:
 
         try:
             xml_source = xml_source.encode("ascii", "xmlcharrefreplace")
-            rendered_xml = self.render_func(
-                self._unescape_entities(xml_source.decode("utf-8")), context
+            rendered_xml = self.render_func( self._unescape_entities(xml_source.decode("utf-8")), context
             )
             final_xml = parseString(rendered_xml.encode("ascii", "xmlcharrefreplace"))
-            self._replace_images(final_xml)
-
             return final_xml
         except ExpatError as e:
             # select 400 lines near the error
@@ -346,7 +338,32 @@ class ODTRenderer:
                 exc_info=True,
             )
             template_string = ""
-            logger.error(
-                f"Unescaped template was:\n {template_string}"
-            )  # FIXME Not sure what he meant here
+            msg = f"Unescaped template was:\n {template_string}"  # FIXME: Not sure what he meant here
+            logger.error(msg)
             raise
+
+    def render(self, src_file: ODTFile, target_file: str | Path, context: dict):
+        rendered_content = self.render_xml(src_file.content, context)
+        self._replace_images(rendered_content, media_writer=src_file.add_image)
+        src_file.content.getElementsByTagName("office:document-content")[0].replaceChild(
+            rendered_content.getElementsByTagName("office:body")[0],
+            src_file.content.getElementsByTagName("office:body")[0],
+        )
+        src_file.files["content.xml"] = src_file.content.toxml()
+        # .encode(
+        #     "ascii", "xmlcharrefreplace"
+        # ))
+
+        src_file.styles = self.render_xml(src_file.styles, context)
+        self._replace_images(src_file.styles, media_writer=src_file.add_image)
+        src_file.files["styles.xml"] = src_file.styles.toxml()
+        # .encode(
+        #     "ascii", "xmlcharrefreplace"
+        # ))
+
+        src_file.files["META-INF/manifest.xml"] = src_file.manifest.toxml().encode(
+            "ascii", "xmlcharrefreplace"
+        )
+
+        document = src_file.pack_document(src_file.files)
+        Path(target_file).write_bytes(document.getvalue())
