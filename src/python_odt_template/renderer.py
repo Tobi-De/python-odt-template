@@ -41,7 +41,7 @@ class ODTRenderer:
     block_end_string: str
     variable_start_string: str
     variable_end_string: str
-    render_func: Callable[[str | Path, dict], str]
+    render_func: Callable[[str, dict], str]
 
     def __post_init__(self):
         self._compile_tags_expressions()

@@ -1,22 +1,37 @@
-"""
-URL configuration for example project.
+from pathlib import Path
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
+from django.http import FileResponse
 from django.urls import path
+from python_odt_template import ODTTemplate
+from python_odt_template.django import get_odt_renderer
+from python_odt_template.libreoffice import convert_to_pdf
+
+
+outputs_dir = Path("../samples/outputs")
+outputs_dir.mkdir(exist_ok=True)
+inputs_dir = Path("../samples/inputs")
+
+
+odt_renderer = get_odt_renderer()
+
+
+def render_odt(request):
+    with ODTTemplate(inputs_dir / "template.odt") as template:
+        odt_renderer.render(
+            template,
+            {"image": "writer.png"},
+        )
+        template.pack(
+            outputs_dir / "template_rendered.odt",
+        )
+        convert_to_pdf(outputs_dir / "template_rendered.odt", outputs_dir)
+    return FileResponse(
+        open(outputs_dir / "template_rendered.pdf", "rb"), as_attachment=True, filename="template_rendered.pdf"
+    )
+
 
 urlpatterns = [
+    path("", render_odt),
     path("admin/", admin.site.urls),
 ]

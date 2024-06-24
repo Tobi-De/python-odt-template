@@ -14,6 +14,8 @@
   - [Table of Contents](#table-of-contents)
   - [Installation](#installation)
   - [Usage](#usage)
+    - [Jinja2](#jinja2)
+    - [Django](#django)
   - [Alternatives](#alternatives)
   - [Credits](#credits)
   - [License](#license)
@@ -25,6 +27,8 @@ pip install python-odt-template
 ```
 
 ## Usage
+
+### Jinja2
 
 ```python
 from python_odt_template import ODTTemplate
@@ -41,6 +45,49 @@ with ODTTemplate("inputs/simple_template.odt") as template, enable_markdown(temp
     )
     template.pack("simple_template_rendered.odt")
     convert_to_pdf("simple_template_rendered.odt", "outputs")
+```
+
+### Django
+
+```python
+# settings.py
+
+# Add at least one staticfiles dirs, this is what the imgae filter will use to find images
+STATICFILES_DIRS = [BASE_DIR / "example" / "static"]
+
+# Add the image filter to the builtins templates config
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        ...
+        "OPTIONS": {
+           ...
+            "builtins": ["python_odt_template.django"],
+        },
+    },
+]
+
+
+# views.py
+from python_odt_template import ODTTemplate
+from python_odt_template.django import get_odt_renderer
+from python_odt_template.libreoffice import convert_to_pdf
+
+
+odt_renderer = get_odt_renderer()
+
+
+def render_odt(request):
+    with ODTTemplate("template.odt") as template:
+        odt_renderer.render(
+            template,
+            {"image": "writer.png"},
+        )
+        template.pack("template_rendered.odt")
+        convert_to_pdf("template_rendered.odt", "outputs")
+    return FileResponse(
+        open("template_rendered.pdf", "rb"), as_attachment=True, filename="template_rendered.pdf"
+    )
 ```
 
 ## Alternatives

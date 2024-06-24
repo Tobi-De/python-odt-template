@@ -41,18 +41,17 @@ class ODTTemplate:
 
     def add_image(self, filepath: Path, name: str) -> str:
         file_type = guess_type(filepath)
-        mime = file_type[0] if file_type[0] else "image/png"  # FIXME
+        mimetype = file_type[0] if file_type[0] else ""
         extension = filepath.suffix if filepath.suffix else guess_extension(mime)
 
         media_path = f"Pictures/{name}{extension}"
         shutil.copy(filepath, self.temp_dir.name + "/" + media_path)
 
-        files_node = self.manifest.getElementsByTagName("manifest:manifest")[0]
-        node = self.manifest.createElement("manifest:file-entry")
-        if files_node:
-            files_node.appendChild(node)
-        node.setAttribute("manifest:full-path", media_path)
-        node.setAttribute("manifest:media-type", mime)
+        manifests = self.manifest.getElementsByTagName("manifest:manifest")[0]
+        media_node = self.manifest.createElement("manifest:file-entry")
+        manifests.appendChild(media_node)
+        media_node.setAttribute("manifest:full-path", media_path)
+        media_node.setAttribute("manifest:media-type", mimetype)
         return media_path
 
     def unpack(self) -> None:

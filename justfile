@@ -12,8 +12,8 @@
     pre-commit run --all-files pyproject-fmt
     pre-commit run --all-files reorder-python-imports
 
-@dj:
-    cd example && hatch run python manage.py
+@dj *ARGS:
+    cd example && hatch run python manage.py {{ ARGS }}
 
 @samples-test:
     cd samples && hatch run python test.py

@@ -48,13 +48,13 @@ environment = Environment(
 )
 
 
-def get_odt_renderer(media_path: str | Path, env: Environment = environment):
+def get_odt_renderer(media_path: str | Path, env: Environment = environment) -> ODTRenderer:
     media_path = Path(media_path)
 
     def image_filter(value):
         return media_path / value
 
-    def render(template_str, context):
+    def render(template_str: str, context: dict) -> str:
         return env.from_string(template_str).render(context)
 
     env.filters["pad"] = pad_string
