@@ -342,10 +342,6 @@ class ODTRenderer:
             rendered_content.getElementsByTagName("office:body")[0],
             template.content.getElementsByTagName("office:body")[0],
         )
-        template.write_file("content.xml", template.content.toxml())
 
         template.styles = self.render_xml(template.styles, context)
         self._replace_images(template.styles, media_writer=template.add_image)
-        template.write_file("styles.xml", template.styles.toxml())
-
-        template.write_file("META-INF/manifest.xml", template.manifest.toxml())

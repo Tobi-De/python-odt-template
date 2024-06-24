@@ -64,8 +64,10 @@ class ODTTemplate:
         logger.debug("packing document")
         zip_file = io.BytesIO()
 
-        # TODO: instead of using the files to pack, for manifest, content and styles,
-        # use the value of the respective properties
+        # save any changes made to content.xml, styles.xml and manifest.xml
+        self.write_file("content.xml", self.content.toxml())
+        self.write_file("styles.xml", self.styles.toxml())
+        self.write_file("META-INF/manifest.xml", self.manifest.toxml())
 
         with zipfile.ZipFile(zip_file, "w", zipfile.ZIP_DEFLATED) as zipdoc:
             for root, _, files in os.walk(self.temp_dir.name):
