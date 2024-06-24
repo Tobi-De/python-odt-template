@@ -33,9 +33,7 @@ countries = [
     {"country": "Mexico", "capital": "MExico City", "cities": ["puebla", "cancun"]},
 ]
 
-with ODTTemplate("inputs/simple_template.odt") as template, enable_markdown(
-    template.markdown_filter
-):
+with ODTTemplate("inputs/simple_template.odt") as template, enable_markdown(template.markdown_filter):
     odt_renderer.render(
         template,
         context={"document": document, "countries": countries},
