@@ -8,6 +8,7 @@ import zipfile
 from mimetypes import guess_extension
 from mimetypes import guess_type
 from pathlib import Path
+from xml.dom.minidom import Node
 from xml.dom.minidom import parseString
 
 from markdown2 import markdown
@@ -24,7 +25,7 @@ class ODTTemplate:
 
     def __init__(self, file_path: Path | str):
         self.file_path = file_path
-        self.temp_dir = tempfile.TemporaryDirectory()
+        self.temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.unpack()
         self.content = parseString(self.read_file("content.xml"))
         self.styles = parseString(self.read_file("styles.xml"))
@@ -63,12 +64,17 @@ class ODTTemplate:
         logger.debug("packing document")
         zip_file = io.BytesIO()
 
+        # TODO: instead of using the files to pack, for manifest, content and styles, 
+        # use the value of the respective properties
+
         with zipfile.ZipFile(zip_file, "w", zipfile.ZIP_DEFLATED) as zipdoc:
-            for root, dirs, files in os.walk(self.temp_dir.name):
+            for root, _, files in os.walk(self.temp_dir.name):
                 for file in files:
                     zipdoc.write(
                         os.path.join(root, file),
-                        arcname=os.path.relpath(os.path.join(root, file), self.temp_dir.name),
+                        arcname=os.path.relpath(
+                            os.path.join(root, file), self.temp_dir.name
+                        ),
                     )
         Path(target).write_bytes(zip_file.getvalue())
         logger.debug("Document packing completed")
@@ -79,55 +85,59 @@ class ODTTemplate:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.temp_dir.cleanup()
 
+    def get_style_by_name(self, style_name: str) -> None | Node:
+        """
+        Search in <office:automatic-styles> for style_name.
+        Return None if style_name is not found. Otherwise
+        return the style node
+        """
+
+        auto_styles = self.content.getElementsByTagName("office:automatic-styles")[0]
+
+        if not auto_styles.hasChildNodes():
+            return None
+
+        for style_node in auto_styles.childNodes:
+            if style_node.hasAttribute("style:name") and (
+                style_node.getAttribute("style:name") == style_name
+            ):
+                return style_node
+
+        return None
+
+    def insert_style_in_content(
+        self, style_name: str, attributes: dict | None = None, **style_properties
+    ) -> Node:
+        """
+        Insert a new style into content.xml's <office:automatic-styles> node.
+        Returns a reference to the newly created node
+        """
+
+        auto_styles = self.content.getElementsByTagName("office:automatic-styles")[0]
+        style_node = self.content.createElement("style:style")
+
+        style_node.setAttribute("style:name", style_name)
+        style_node.setAttribute("style:family", "text")
+        style_node.setAttribute("style:parent-style-name", "Standard")
+
+        if attributes:
+            for k, v in attributes.items():
+                style_node.setAttribute("style:%s" % k, v)
+
+        if style_properties:
+            style_prop = self.content.createElement("style:text-properties")
+            for k, v in style_properties.items():
+                style_prop.setAttribute("%s" % k, v)
+
+            style_node.appendChild(style_prop)
+
+        return auto_styles.appendChild(style_node)
+
     def get_markdown_filter(self):
         def markdown_filter(markdown_text):
             """
             Convert a markdown text into a ODT formated text
             """
-
-            def get_style_by_name(style_name):
-                """
-                Search in <office:automatic-styles> for style_name.
-                Return None if style_name is not found. Otherwise
-                return the style node
-                """
-
-                auto_styles = self.content.getElementsByTagName("office:automatic-styles")[0]
-
-                if not auto_styles.hasChildNodes():
-                    return None
-
-                for style_node in auto_styles.childNodes:
-                    if style_node.hasAttribute("style:name") and (style_node.getAttribute("style:name") == style_name):
-                        return style_node
-
-                return None
-
-            def insert_style_in_content(style_name, attributes=None, **style_properties):
-                """
-                Insert a new style into content.xml's <office:automatic-styles> node.
-                Returns a reference to the newly created node
-                """
-
-                auto_styles = self.content.getElementsByTagName("office:automatic-styles")[0]
-                style_node = self.content.createElement("style:style")
-
-                style_node.setAttribute("style:name", style_name)
-                style_node.setAttribute("style:family", "text")
-                style_node.setAttribute("style:parent-style-name", "Standard")
-
-                if attributes:
-                    for k, v in attributes.items():
-                        style_node.setAttribute("style:%s" % k, v)
-
-                if style_properties:
-                    style_prop = self.content.createElement("style:text-properties")
-                    for k, v in style_properties.items():
-                        style_prop.setAttribute("%s" % k, v)
-
-                    style_node.appendChild(style_prop)
-
-                return auto_styles.appendChild(style_node)
 
             if not isinstance(markdown_text, basestring):
                 return ""
@@ -147,7 +157,9 @@ class ODTTemplate:
             for tag in transform_map:
                 html_nodes = xml_object.getElementsByTagName(tag)
                 for html_node in html_nodes:
-                    odt_node = xml_object.createElement(transform_map[tag]["replace_with"])
+                    odt_node = xml_object.createElement(
+                        transform_map[tag]["replace_with"]
+                    )
 
                     # Transfer child nodes
                     if html_node.hasChildNodes():
@@ -168,11 +180,19 @@ class ODTTemplate:
                                         traverse_preformated(n)
                                 else:
                                     container = xml_object.createElement("text:span")
-                                    for text in re.split("(\n)", node.nodeValue.lstrip("\n")):
+                                    for text in re.split(
+                                        "(\n)", node.nodeValue.lstrip("\n")
+                                    ):
                                         if text == "\n":
-                                            container.appendChild(xml_object.createElement("text:line-break"))
+                                            container.appendChild(
+                                                xml_object.createElement(
+                                                    "text:line-break"
+                                                )
+                                            )
                                         else:
-                                            container.appendChild(xml_object.createTextNode(text))
+                                            container.appendChild(
+                                                xml_object.createTextNode(text)
+                                            )
 
                                     node.parentNode.replaceChild(container, node)
 
@@ -197,17 +217,19 @@ class ODTTemplate:
                         # copy original href attribute in <a> tag
                         if tag == "a":
                             if html_node.hasAttribute("href"):
-                                odt_node.setAttribute("xlink:href", html_node.getAttribute("href"))
+                                odt_node.setAttribute(
+                                    "xlink:href", html_node.getAttribute("href")
+                                )
 
                     # Does the node need to create an style?
                     if "style" in transform_map[tag]:
                         name = transform_map[tag]["style"]["name"]
                         if name not in styles_cache:
-                            style_node = get_style_by_name(name)
+                            style_node = self.get_style_by_name(name)
 
                             if style_node is None:
                                 # Create and cache the style node
-                                style_node = insert_style_in_content(
+                                style_node = self.insert_style_in_content(
                                     name,
                                     transform_map[tag]["style"].get("attributes", None),
                                     **transform_map[tag]["style"]["properties"],

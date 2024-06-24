@@ -14,3 +14,9 @@
 
 @dj:
     cd example && hatch run python manage.py
+
+@samples-test:
+    cd samples && hatch run python test.py
+
+@samples-clean:
+    rm -r samples/outputs

@@ -7,6 +7,8 @@ from python_odt_template.jinja import get_odt_renderer
 from python_odt_template.libreoffice import convert_to_pdf
 
 odt_renderer = get_odt_renderer(media_path="inputs")
+outputs_dir = Path("outputs")
+outputs_dir.mkdir(exist_ok=True)
 
 document = {
     "datetime": dt.datetime.now(),
@@ -31,12 +33,15 @@ countries = [
     {"country": "Mexico", "capital": "MExico City", "cities": ["puebla", "cancun"]},
 ]
 
-with ODTTemplate("inputs/simple_template.odt") as template, enable_markdown(template.get_markdown_filter()):
+with ODTTemplate("inputs/simple_template.odt") as template, enable_markdown(
+    template.get_markdown_filter()
+):
     odt_renderer.render(
         template,
         context={"document": document, "countries": countries},
     )
-    template.pack("simple_template_rendered.odt")
+    template.pack(outputs_dir / "simple_template_rendered.odt")
+    convert_to_pdf(outputs_dir / "simple_template_rendered.odt", outputs_dir)
 
 with ODTTemplate("inputs/template.odt") as template:
     odt_renderer.render(
@@ -44,11 +49,6 @@ with ODTTemplate("inputs/template.odt") as template:
         {"image": "writer.png"},
     )
     template.pack(
-        "template_rendered.odt",
+        outputs_dir / "template_rendered.odt",
     )
-    convert_to_pdf("template_rendered.odt", "outputs")
-
-with ODTTemplate("inputs/checkin.odt") as template:
-    odt_renderer.render(template, {"value": "Something"})
-    template.pack("checkin_rendered.odt")
-    convert_to_pdf("checkin_rendered.odt", "outputs")
+    convert_to_pdf(outputs_dir / "template_rendered.odt", outputs_dir)
