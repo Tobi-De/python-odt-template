@@ -38,7 +38,7 @@ from python_odt_template.libreoffice import convert_to_pdf
 
 odt_renderer = get_odt_renderer(media_path="inputs")
 
-with ODTTemplate("inputs/simple_template.odt") as template, enable_markdown(template.markdown_filter):
+with ODTTemplate("inputs/simple_template.odt") as template:
     odt_renderer.render(
         template,
         context={"document": document, "countries": countries},
