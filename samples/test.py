@@ -34,7 +34,7 @@ countries = [
 ]
 
 with ODTTemplate("inputs/simple_template.odt") as template, enable_markdown(
-    template.get_markdown_filter()
+    template.markdown_filter
 ):
     odt_renderer.render(
         template,

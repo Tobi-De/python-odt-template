@@ -10,11 +10,13 @@
 
 ## Table of Contents
 
-- [Installation](#installation)
-- [Usage](#usage)
-- [Alternatives](#alternatives)
-- [Credits](#credits)
-- [License](#license)
+- [python-odt-template](#python-odt-template)
+  - [Table of Contents](#table-of-contents)
+  - [Installation](#installation)
+  - [Usage](#usage)
+  - [Alternatives](#alternatives)
+  - [Credits](#credits)
+  - [License](#license)
 
 ## Installation
 
@@ -32,7 +34,7 @@ from python_odt_template.libreoffice import convert_to_pdf
 
 odt_renderer = get_odt_renderer(media_path="inputs")
 
-with ODTTemplate("inputs/simple_template.odt") as template, enable_markdown(template.get_markdown_filter()):
+with ODTTemplate("inputs/simple_template.odt") as template, enable_markdown(template.markdown_filter):
     odt_renderer.render(
         template,
         context={"document": document, "countries": countries},
