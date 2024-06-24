@@ -1,9 +1,10 @@
+from python_odt_template.renderer import ODTRenderer
+
 from django import template
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.template import Context
 from django.template import Template
-from python_odt_template.renderer import ODTRenderer
 
 
 register = template.Library()

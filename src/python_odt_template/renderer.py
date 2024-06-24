@@ -52,9 +52,13 @@ class ODTRenderer:
             rf"(?is)^({self.variable_start_string}|{self.block_start_string}).*({self.variable_end_string}|{self.block_end_string})$"
         )
 
-        self.variable_pattern = re.compile(rf"(?is)({self.variable_start_string})(.*)({self.variable_end_string})$")
+        self.variable_pattern = re.compile(
+            rf"(?is)({self.variable_start_string})(.*)({self.variable_end_string})$"
+        )
 
-        self.block_pattern = re.compile(rf"(?is)({self.block_start_string})(.*)({self.block_end_string})$")
+        self.block_pattern = re.compile(
+            rf"(?is)({self.block_start_string})(.*)({self.block_end_string})$"
+        )
 
     def _compile_escape_expressions(self):
         # Compiles escape expressions
@@ -274,7 +278,9 @@ class ODTRenderer:
                 "".join(
                     [
                         match.group(1),
-                        self.variable_pattern.sub(r"\1 SafeValue(\2) \3", unquote(match.group(2))),
+                        self.variable_pattern.sub(
+                            r"\1 SafeValue(\2) \3", unquote(match.group(2))
+                        ),
                         match.group(3),
                     ]
                 )
@@ -287,7 +293,9 @@ class ODTRenderer:
 
         return xml_text
 
-    def _replace_images(self, xml_document: Document, media_writer: Callable[[Path, str], str]):
+    def _replace_images(
+        self, xml_document: Document, media_writer: Callable[[Path, str], str]
+    ):
         logger.debug("Inserting images")
         frames = xml_document.getElementsByTagName("draw:frame")
 
@@ -312,33 +320,29 @@ class ODTRenderer:
 
         self._prepare_document_tags(xml_document)
         xml_source = xml_document.toxml()
+        rendered_xml = self.render_func(self._unescape_entities(xml_source), context)
 
         try:
-            xml_source = xml_source.encode("ascii", "xmlcharrefreplace")
-            rendered_xml = self.render_func(self._unescape_entities(xml_source.decode("utf-8")), context)
             final_xml = parseString(rendered_xml.encode("ascii", "xmlcharrefreplace"))
             return final_xml
         except ExpatError as e:
-            # select 400 lines near the error
-            near = xml_source.split("\n")[e.lineno - 1][e.offset - 200 : e.offset + 200]
-            raise ExpatError(
-                f'ExpatError "ErrorString(e.code)" at line {e.lineno}, column {e.offset}\nNear of: "[...]{near}[...]"'
-            ) from e
-        except Exception:
-            logger.error(
-                "Error rendering template:\n%s",
-                xml_document.toprettyxml(),
-                exc_info=True,
+            N_CONTEXT_CHARS = 38
+            line = rendered_xml.split("\n")[e.lineno - 1]
+            lower = max(0, e.offset - N_CONTEXT_CHARS)
+            upper = min(e.offset + N_CONTEXT_CHARS, len(line))
+            error_context = line[lower:upper]
+            sep = "-" * (e.offset - lower) + "^"
+            e.args = (
+                f"Invalid XML near line {e.lineno}, column {e.offset}\n{error_context}\n{sep}",
             )
-            template_string = ""
-            msg = f"Unescaped template was:\n {template_string}"  # FIXME: Not sure what he meant here
-            logger.error(msg)
             raise
 
     def render(self, template: ODTTemplate, context: dict) -> None:
         rendered_content = self.render_xml(template.content, context)
         self._replace_images(rendered_content, media_writer=template.add_image)
-        template.content.getElementsByTagName("office:document-content")[0].replaceChild(
+        template.content.getElementsByTagName("office:document-content")[
+            0
+        ].replaceChild(
             rendered_content.getElementsByTagName("office:body")[0],
             template.content.getElementsByTagName("office:body")[0],
         )

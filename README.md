@@ -86,7 +86,7 @@ def render_odt(request):
         template.pack("template_rendered.odt")
         convert_to_pdf("template_rendered.odt", "outputs")
     return FileResponse(
-        open("template_rendered.pdf", "rb"), as_attachment=True, filename="template_rendered.pdf"
+        open("outputs/template_rendered.pdf", "rb"), as_attachment=True, filename="template_rendered.pdf"
     )
 ```
 

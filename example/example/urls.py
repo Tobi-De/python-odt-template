@@ -1,11 +1,12 @@
 from pathlib import Path
 
-from django.contrib import admin
-from django.http import FileResponse
-from django.urls import path
 from python_odt_template import ODTTemplate
 from python_odt_template.django import get_odt_renderer
 from python_odt_template.libreoffice import convert_to_pdf
+
+from django.contrib import admin
+from django.http import FileResponse
+from django.urls import path
 
 
 outputs_dir = Path("../samples/outputs")
