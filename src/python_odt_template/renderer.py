@@ -3,8 +3,10 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
+from typing import cast
 from urllib.parse import unquote
 from xml.dom.minidom import Document
+from xml.dom.minidom import Node
 from xml.dom.minidom import parseString
 from xml.parsers.expat import ExpatError
 
@@ -52,13 +54,9 @@ class ODTRenderer:
             rf"(?is)^({self.variable_start_string}|{self.block_start_string}).*({self.variable_end_string}|{self.block_end_string})$"
         )
 
-        self.variable_pattern = re.compile(
-            rf"(?is)({self.variable_start_string})(.*)({self.variable_end_string})$"
-        )
+        self.variable_pattern = re.compile(rf"(?is)({self.variable_start_string})(.*)({self.variable_end_string})$")
 
-        self.block_pattern = re.compile(
-            rf"(?is)({self.block_start_string})(.*)({self.block_end_string})$"
-        )
+        self.block_pattern = re.compile(rf"(?is)({self.block_start_string})(.*)({self.block_end_string})$")
 
     def _compile_escape_expressions(self):
         # Compiles escape expressions
@@ -68,7 +66,7 @@ class ODTRenderer:
             r"&lt;": r"<",
             r"&amp;": r"&",
             r"&quot;": r'"',
-            r"&apos;": r"\'",
+            r"&apos;": r"'",
         }
 
         for key, value in unescape_rules.items():
@@ -98,25 +96,6 @@ class ODTRenderer:
         """
         return len(self.block_pattern.findall(tag)) > 0
 
-    @classmethod
-    def _inc_node_tags_count(cls, node, is_block=False):
-        """Increase field count of node and its parents"""
-
-        if node is None:
-            return
-
-        for attr in ["field_count", "block_count", "var_count"]:
-            if not hasattr(node, attr):
-                setattr(node, attr, 0)
-
-        node.field_count += 1
-        if is_block:
-            node.block_count += 1
-        else:
-            node.var_count += 1
-
-        cls._inc_node_tags_count(node.parentNode, is_block)
-
     def _tags_in_document(self, document: Document):
         """
         Yields a list of available template instructions tags in document.
@@ -142,23 +121,11 @@ class ODTRenderer:
         """
         for tag in self._tags_in_document(document):
             content = tag.childNodes[0].data.strip()
-            block_tag = self._is_block_tag(content)
+            is_block = self._is_block_tag(content)
 
-            self._inc_node_tags_count(tag.parentNode, block_tag)
+            count_node_decendant_tags(tag.parentNode, is_block)
 
-    def _parent_of_type(self, node, of_type):
-        # Returns the first immediate parent of type `of_type`.
-        # Returns None if nothing is found.
-
-        if hasattr(node, "parentNode"):
-            if node.parentNode.nodeName.lower() == of_type:
-                return node.parentNode
-            else:
-                return self._parent_of_type(node.parentNode, of_type)
-        else:
-            return None
-
-    def _prepare_document_tags(self, document: Document):
+    def _prepare_tags(self, document: Document):
         """Here we search for every field node present in xml_document.
         For each field we found we do:
         * if field is a print field ({{ field }}), we replace it with a
@@ -198,17 +165,14 @@ class ODTRenderer:
           </table>
         """
 
-        # -------------------------------------------------------------------- #
+        self._census_tags(document)
+
         # We have to replace a node, let's call it "placeholder", with the
         # content of our jinja tag. The placeholder can be a node with all its
         # children. Node's "text:description" attribute indicates how far we
         # can scale up in the tree hierarchy to get our placeholder node. When
         # said attribute is not present, then we scale up until we find a
         # common parent for this tag and any other tag.
-        # -------------------------------------------------------------------- #
-        logger.debug("Preparing document tags")
-        self._census_tags(document)
-
         for tag in self._tags_in_document(document):
             placeholder = tag
             content = tag.childNodes[0].data.strip()
@@ -221,13 +185,13 @@ class ODTRenderer:
 
             if scale_to:
                 if FLOW_REFERENCES.get(scale_to, False):
-                    placeholder = self._parent_of_type(tag, FLOW_REFERENCES[scale_to])
+                    placeholder = get_node_parent_of_name(tag, FLOW_REFERENCES[scale_to])
 
                 new_node = document.createTextNode(content)
 
             elif is_block:
                 # expand up the placeholder until a shared parent is found
-                while not placeholder.parentNode.field_count > 1:
+                while not placeholder.parentNode.tags_count > 1:
                     placeholder = placeholder.parentNode
 
                 if placeholder:
@@ -248,7 +212,7 @@ class ODTRenderer:
 
             if scale_to.startswith(("after::", "before::")):
                 # Don't remove whole field tag, only "text:text-input" container
-                placeholder = self._parent_of_type(tag, "text:p")
+                placeholder = get_node_parent_of_name(tag, "text:p")
                 placeholder_parent = placeholder.parentNode
 
             # Finally, remove the placeholder
@@ -278,9 +242,7 @@ class ODTRenderer:
                 "".join(
                     [
                         match.group(1),
-                        self.variable_pattern.sub(
-                            r"\1 SafeValue(\2) \3", unquote(match.group(2))
-                        ),
+                        self.variable_pattern.sub(r"\1 SafeValue(\2) \3", unquote(match.group(2))),
                         match.group(3),
                     ]
                 )
@@ -293,9 +255,7 @@ class ODTRenderer:
 
         return xml_text
 
-    def _replace_images(
-        self, xml_document: Document, media_writer: Callable[[Path, str], str]
-    ):
+    def _replace_images(self, xml_document: Document, media_writer: Callable[[Path, str], str]):
         logger.debug("Inserting images")
         frames = xml_document.getElementsByTagName("draw:frame")
 
@@ -318,7 +278,7 @@ class ODTRenderer:
         # Prepare the xml object to be processed by jinja2
         logger.debug("Rendering XML object")
 
-        self._prepare_document_tags(xml_document)
+        self._prepare_tags(xml_document)
         xml_source = xml_document.toxml()
         rendered_xml = self.render_func(self._unescape_entities(xml_source), context)
 
@@ -332,20 +292,51 @@ class ODTRenderer:
             upper = min(e.offset + N_CONTEXT_CHARS, len(line))
             error_context = line[lower:upper]
             sep = "-" * (e.offset - lower) + "^"
-            e.args = (
-                f"Invalid XML near line {e.lineno}, column {e.offset}\n{error_context}\n{sep}",
-            )
+            e.args = (f"Invalid XML near line {e.lineno}, column {e.offset}\n{error_context}\n{sep}",)
             raise
 
     def render(self, template: ODTTemplate, context: dict) -> None:
         rendered_content = self.render_xml(template.content, context)
         self._replace_images(rendered_content, media_writer=template.add_image)
-        template.content.getElementsByTagName("office:document-content")[
-            0
-        ].replaceChild(
+        template.content.getElementsByTagName("office:document-content")[0].replaceChild(
             rendered_content.getElementsByTagName("office:body")[0],
             template.content.getElementsByTagName("office:body")[0],
         )
 
         template.styles = self.render_xml(template.styles, context)
         self._replace_images(template.styles, media_writer=template.add_image)
+
+
+def get_node_parent_of_name(node: Node, name: str) -> Node | str:
+    """
+    Returns the node's parent with name equal to *name*.
+    Returns None if a parent with that name is not found.
+    """
+    if not hasattr(node, "parentNode"):
+        return None
+
+    if node.parentNode.nodeName.lower() == name.lower():
+        return node.parentNode
+
+    # Look into node's grandparent
+    return get_node_parent_of_name(node.parentNode, name)
+
+
+def count_node_decendant_tags(node: Node, is_block_tag: bool):
+    """
+    Increate *node* tags_count property and block_count property
+    if *is_block_tag* is True. Otherwise increase *var_count* property.
+    This is also done recursevely for this node parents.
+    """
+    if not node:
+        return
+
+    # start counter
+    for attr in ["tags_count", "block_count", "var_count"]:
+        if not hasattr(node, attr):
+            setattr(node, attr, 0)
+
+    node.tags_count += 1
+    count_var_name = "block_count" if is_block_tag else "var_count"
+    setattr(node, count_var_name, getattr(node, count_var_name) + 1)
+    count_node_decendant_tags(node.parentNode, is_block_tag)
