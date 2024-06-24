@@ -6,7 +6,6 @@ from django.core.exceptions import ImproperlyConfigured
 from django.template import Context
 from django.template import Template
 
-
 register = template.Library()
 
 
@@ -14,8 +13,9 @@ register = template.Library()
 def image(value):
     try:
         static_path = settings.STATICFILES_DIRS[0]
-    except IndexError:
-        raise ImproperlyConfigured("You must add a least one directory to STATICFILES_DIRS in your settings.py file")
+    except IndexError as e:
+        msg = "You must add a least one directory to STATICFILES_DIRS in your settings.py file"
+        raise ImproperlyConfigured(msg) from e
     return static_path / value
 
 

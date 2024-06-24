@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -12,10 +14,11 @@ __all__ = ("get_odt_renderer", "enable_markdown")
 class UndefinedSilently(Undefined):
     # Silently undefined,
     # see http://stackoverflow.com/questions/6182498
-    def silently_undefined(*args, **kwargs):
+    def silently_undefined(*_, **__):
         return ""
 
-    return_new = lambda *args, **kwargs: UndefinedSilently()
+    def return_new(*_, **__):
+        return UndefinedSilently()
 
     __unicode__ = silently_undefined
     __str__ = silently_undefined
@@ -60,14 +63,13 @@ def get_odt_renderer(media_path: str | Path, env: Environment = environment) -> 
     env.filters["pad"] = pad_string
     env.globals["SafeValue"] = Markup
     env.filters["image"] = image_filter
-    odt_renderer = ODTRenderer(
+    return ODTRenderer(
         block_end_string=env.block_end_string,
         block_start_string=env.block_start_string,
         variable_end_string=env.variable_end_string,
         variable_start_string=env.variable_start_string,
         render_func=render,
     )
-    return odt_renderer
 
 
 @contextmanager

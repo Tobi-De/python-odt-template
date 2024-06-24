@@ -8,7 +8,6 @@ from django.contrib import admin
 from django.http import FileResponse
 from django.urls import path
 
-
 outputs_dir = Path("../samples/outputs")
 outputs_dir.mkdir(exist_ok=True)
 inputs_dir = Path("../samples/inputs")
@@ -17,7 +16,7 @@ inputs_dir = Path("../samples/inputs")
 odt_renderer = get_odt_renderer()
 
 
-def render_odt(request):
+def render_odt(_):
     with ODTTemplate(inputs_dir / "template.odt") as template:
         odt_renderer.render(
             template,

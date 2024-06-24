@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import io
-import logging
 import os
 import re
 import shutil
@@ -8,16 +9,15 @@ import zipfile
 from mimetypes import guess_extension
 from mimetypes import guess_type
 from pathlib import Path
-from xml.dom.minidom import Node
-from xml.dom.minidom import parseString
+from typing import TYPE_CHECKING
 
+from defusedxml.minidom import parseString
 from markdown2 import markdown
 from markupsafe import Markup
 from python_odt_template.markdown_map import transform_map
 
-basestring = (str, bytes)
-
-logger = logging.getLogger("python_odt_template")
+if TYPE_CHECKING:
+    from xml.dom.minidom import Node
 
 
 class ODTTemplate:
@@ -36,13 +36,13 @@ class ODTTemplate:
             file.write(content)
 
     def read_file(self, name: str) -> str:
-        with open(self.temp_dir.name + "/" + name, "r") as file:
+        with open(self.temp_dir.name + "/" + name) as file:
             return file.read()
 
     def add_image(self, filepath: Path, name: str) -> str:
         file_type = guess_type(filepath)
         mimetype = file_type[0] if file_type[0] else ""
-        extension = filepath.suffix if filepath.suffix else guess_extension(mime)
+        extension = filepath.suffix if filepath.suffix else guess_extension(mimetype)
 
         media_path = f"Pictures/{name}{extension}"
         shutil.copy(filepath, self.temp_dir.name + "/" + media_path)
@@ -55,12 +55,10 @@ class ODTTemplate:
         return media_path
 
     def unpack(self) -> None:
-        logger.debug("Unpacking template file")
         with zipfile.ZipFile(self.file_path, "r") as archive:
             archive.extractall(path=self.temp_dir.name)
 
     def pack(self, target: str | Path) -> None:
-        logger.debug("packing document")
         zip_file = io.BytesIO()
 
         # save any changes made to content.xml, styles.xml and manifest.xml
@@ -76,7 +74,6 @@ class ODTTemplate:
                         arcname=os.path.relpath(os.path.join(root, file), self.temp_dir.name),
                     )
         Path(target).write_bytes(zip_file.getvalue())
-        logger.debug("Document packing completed")
 
     def __enter__(self):
         return self
@@ -117,12 +114,12 @@ class ODTTemplate:
 
         if attributes:
             for k, v in attributes.items():
-                style_node.setAttribute("style:%s" % k, v)
+                style_node.setAttribute(f"style:{k}", v)
 
         if style_properties:
             style_prop = self.content.createElement("style:text-properties")
             for k, v in style_properties.items():
-                style_prop.setAttribute("%s" % k, v)
+                style_prop.setAttribute(k, v)
 
             style_node.appendChild(style_prop)
 
@@ -133,7 +130,7 @@ class ODTTemplate:
         Convert a markdown text into a ODT formated text
         """
 
-        if not isinstance(markdown_text, basestring):
+        if not isinstance(markdown_text, str):
             return ""
 
         styles_cache = {}  # cache styles searching
@@ -142,7 +139,7 @@ class ODTTemplate:
         if isinstance(encoded, bytes):
             # In PY3 bytes-like object needs convert to str
             encoded = encoded.decode("ascii")
-        xml_object = parseString("<html>%s</html>" % encoded)
+        xml_object = parseString(f"<html>{encoded}</html>")
 
         # Transform HTML tags as specified in transform_map
         # Some tags may require extra attributes in ODT.
@@ -191,7 +188,7 @@ class ODTTemplate:
                 # Add style-attributes defined in transform_map
                 if "style_attributes" in transform_map[tag]:
                     for k, v in transform_map[tag]["style_attributes"].items():
-                        odt_node.setAttribute("text:%s" % k, v)
+                        odt_node.setAttribute(f"text:{k}", v)
 
                 # Add defined attributes
                 if "attributes" in transform_map[tag]:
@@ -199,9 +196,8 @@ class ODTTemplate:
                         odt_node.setAttribute(k, v)
 
                     # copy original href attribute in <a> tag
-                    if tag == "a":
-                        if html_node.hasAttribute("href"):
-                            odt_node.setAttribute("xlink:href", html_node.getAttribute("href"))
+                    if tag == "a" and html_node.hasAttribute("href"):
+                        odt_node.setAttribute("xlink:href", html_node.getAttribute("href"))
 
                 # Does the node need to create an style?
                 if "style" in transform_map[tag]:
@@ -220,12 +216,9 @@ class ODTTemplate:
 
                 html_node.parentNode.replaceChild(odt_node, html_node)
 
-        ODTText = "".join(
+        odttext = "".join(
             node_as_str
-            for node_as_str in map(
-                lambda node: node.toxml(),
-                xml_object.getElementsByTagName("html")[0].childNodes,
-            )
+            for node_as_str in (node.toxml() for node in xml_object.getElementsByTagName("html")[0].childNodes)
         )
 
-        return Markup(ODTText)
+        return Markup(odttext)

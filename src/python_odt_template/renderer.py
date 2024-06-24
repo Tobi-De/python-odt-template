@@ -1,17 +1,21 @@
+from __future__ import annotations
+
 import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
-from typing import cast
+from typing import TYPE_CHECKING
 from urllib.parse import unquote
-from xml.dom.minidom import Document
-from xml.dom.minidom import Node
-from xml.dom.minidom import parseString
 from xml.parsers.expat import ExpatError
 
+from defusedxml.minidom import parseString
 from markupsafe import Markup
-from python_odt_template import ODTTemplate
+
+if TYPE_CHECKING:
+    from python_odt_template import ODTTemplate
+    from xml.dom.minidom import Document
+    from xml.dom.minidom import Node
 
 logger = logging.getLogger("python_odt_template")
 
@@ -71,7 +75,7 @@ class ODTRenderer:
 
         for key, value in unescape_rules.items():
             exp = r"(?is)(({0}|{1})[^{3}{4}]*?)({2})([^{0}{1}]*?({3}|{4}))"
-            key = re.compile(
+            k = re.compile(
                 exp.format(
                     self.variable_start_string,
                     self.block_start_string,
@@ -81,7 +85,7 @@ class ODTRenderer:
                 )
             )
 
-            self.escape_map[key] = rf"\1{value}\4"
+            self.escape_map[k] = rf"\1{value}\4"
 
     def _is_template_tag(self, tag: str):
         """
@@ -256,7 +260,6 @@ class ODTRenderer:
         return xml_text
 
     def _replace_images(self, xml_document: Document, media_writer: Callable[[Path, str], str]):
-        logger.debug("Inserting images")
         frames = xml_document.getElementsByTagName("draw:frame")
 
         for frame in frames:
@@ -266,7 +269,7 @@ class ODTRenderer:
             image = Path(frame.getAttribute("draw:name"))
 
             if not (image.exists() and image.is_file()):
-                logger.debug(f"Image file {image} not found")
+                logger.debug("Image file not found", extra={"image": image})
                 continue
 
             image_node = frame.childNodes[0]
@@ -275,21 +278,17 @@ class ODTRenderer:
             image_node.setAttribute("xlink:href", media_path)
 
     def render_xml(self, xml_document: Document, context: dict) -> Document:
-        # Prepare the xml object to be processed by jinja2
-        logger.debug("Rendering XML object")
-
         self._prepare_tags(xml_document)
         xml_source = xml_document.toxml()
         rendered_xml = self.render_func(self._unescape_entities(xml_source), context)
 
         try:
-            final_xml = parseString(rendered_xml.encode("ascii", "xmlcharrefreplace"))
-            return final_xml
+            return parseString(rendered_xml.encode("ascii", "xmlcharrefreplace"))
         except ExpatError as e:
-            N_CONTEXT_CHARS = 38
+            n_context_chars = 38
             line = rendered_xml.split("\n")[e.lineno - 1]
-            lower = max(0, e.offset - N_CONTEXT_CHARS)
-            upper = min(e.offset + N_CONTEXT_CHARS, len(line))
+            lower = max(0, e.offset - n_context_chars)
+            upper = min(e.offset + n_context_chars, len(line))
             error_context = line[lower:upper]
             sep = "-" * (e.offset - lower) + "^"
             e.args = (f"Invalid XML near line {e.lineno}, column {e.offset}\n{error_context}\n{sep}",)

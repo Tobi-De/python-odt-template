@@ -37,6 +37,7 @@ dynamic = [
   "version",
 ]
 dependencies = [
+  "defusedxml",
   "markdown2",
 ]
 
@@ -69,6 +70,17 @@ extra-dependencies = [
 ]
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/python_odt_template tests}"
+
+[tool.ruff]
+lint.extend-ignore = [
+  "I001",
+  "I002",
+  "S310",
+]
+
+lint.extend-per-file-ignores."example/*" = [
+  "INP001",
+]
 
 [tool.coverage.run]
 source_pkgs = [

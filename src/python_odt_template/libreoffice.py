@@ -17,7 +17,7 @@ class LibreOfficeError(Exception):
 
 def libreoffice(*args, raise_on_error=False) -> None:
     exec_name = "/Applications/LibreOffice.app/Contents/MacOS/soffice" if platform.system() == "Darwin" else "soffice"
-    logger.debug(f"Running LibreOffice with args: {args}")
+    logger.debug("Running LibreOffice", extra=args)
     process = subprocess.run(
         [exec_name, "--headless", *args],
         check=False,
@@ -31,6 +31,6 @@ def libreoffice(*args, raise_on_error=False) -> None:
 
 def convert_to_pdf(source_file: str | Path, output_dir: str | Path) -> None:
     if not Path(source_file).exists():
-        raise FileNotFoundError(f"File not found: {source_file}")
-    logger.info(f"Converting {source_file} to {output_dir}")
+        msg = f"File not found: {source_file}"
+        raise FileNotFoundError(msg)
     libreoffice("--convert-to", "pdf", "--outdir", output_dir, source_file)
