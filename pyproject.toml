@@ -38,6 +38,7 @@ dynamic = [
 ]
 dependencies = [
   "defusedxml",
+  "lxml",
   "markdown2",
 ]
 
@@ -60,8 +61,8 @@ features = [
   "jinja",
 ]
 dependencies = [
+  "lxml-stubs",
   "ipython",
-  "markdown2",
 ]
 
 [tool.hatch.envs.types]
