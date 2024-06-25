@@ -3,8 +3,10 @@
 # SPDX-License-Identifier: MIT
 from __future__ import annotations
 
-from .libreoffice import convert_to_pdf
-from .libreoffice import libreoffice
+from .libreoffice import LibreOffice
+from .libreoffice import LibreOfficeError
+from .libreoffice import LOConverter
+from .libreoffice import UnoConvert
 from .template import ODTTemplate
 
-__all__ = ("libreoffice", "convert_to_pdf", "ODTTemplate")
+__all__ = ("ODTTemplate", "LibreOffice", "UnoConvert", "LOConverter", "LibreOfficeError")
