@@ -1,11 +1,11 @@
 # https://gist.githubusercontent.com/regebro/036da022dc7d5241a0ee97efdf1458eb/raw/find_uno.py
-
 import glob
 import os
 import pathlib
 import signal
 import subprocess
 import sys
+
 from .libreoffice import LibreOffice
 
 
@@ -15,23 +15,16 @@ def get_uno_python():
 
     if os.name in ("nt", "os2"):
         if "PROGRAMFILES" in list(os.environ.keys()):
-            possible_python_paths += glob.glob(
-                os.environ["PROGRAMFILES"] + "\\LibreOffice*"
-            )
+            possible_python_paths += glob.glob(os.environ["PROGRAMFILES"] + "\\LibreOffice*")
 
         if "PROGRAMFILES(X86)" in list(os.environ.keys()):
-            possible_python_paths += glob.glob(
-                os.environ["PROGRAMFILES(X86)"] + "\\LibreOffice*"
-            )
+            possible_python_paths += glob.glob(os.environ["PROGRAMFILES(X86)"] + "\\LibreOffice*")
 
         if "PROGRAMW6432" in list(os.environ.keys()):
-            possible_python_paths += glob.glob(
-                os.environ["PROGRAMW6432"] + "\\LibreOffice*"
-            )
+            possible_python_paths += glob.glob(os.environ["PROGRAMW6432"] + "\\LibreOffice*")
 
     elif sys.platform == "darwin":
-        possible_python_paths += ["/Applications/LibreOffice.app/Contents",
-                                  "/Applications/LibreOffice.app/Resources"]
+        possible_python_paths += ["/Applications/LibreOffice.app/Contents", "/Applications/LibreOffice.app/Resources"]
     else:
         possible_python_paths += [
             "/usr/bin",
@@ -39,10 +32,10 @@ def get_uno_python():
             "~/.local/bin",
         ]
         possible_python_paths += (
-                glob.glob("/usr/lib*/libreoffice*")
-                + glob.glob("/opt/libreoffice*")
-                + glob.glob("/usr/local/lib/libreoffice*")
-                + glob.glob(os.path.expanduser("./local/lib/libreoffice*"))
+            glob.glob("/usr/lib*/libreoffice*")
+            + glob.glob("/opt/libreoffice*")
+            + glob.glob("/usr/local/lib/libreoffice*")
+            + glob.glob(os.path.expanduser("./local/lib/libreoffice*"))
         )
 
     found_pythons = []
@@ -90,9 +83,10 @@ if __name__ == "__main__":
         subprocess.run([uno_python, "-m", "pip", "install", "unoserver"])
         print(f"Set UNOSERVER_PYTHON={uno_python} to this installation process.")
     print(f"Using python at {uno_python}")
-
+    command = [uno_python, "-m", "unoserver.server", "--executable", LibreOffice().exec_bin, *sys.argv[1:]]
+    print("Will Run ", " ".join(command))
     try:
-        process = subprocess.Popen([uno_python, "-m", "unoserver.server", "--executable", LibreOffice().exec_bin])
+        process = subprocess.Popen(command)
         process.wait()
     except KeyboardInterrupt:
         print("\nStopping the server...")
