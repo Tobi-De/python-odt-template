@@ -7,6 +7,8 @@ from .libreoffice import LibreOffice
 from .libreoffice import LibreOfficeError
 from .libreoffice import LOConverter
 from .libreoffice import UnoConvert
+from .libreoffice import unoconvert
+from .libreoffice import libreoffice
 from .template import ODTTemplate
 
-__all__ = ("ODTTemplate", "LibreOffice", "UnoConvert", "LOConverter", "LibreOfficeError")
+__all__ = ("ODTTemplate", "LibreOffice", "UnoConvert", "LOConverter", "LibreOfficeError", "unoconvert", "libreoffice")

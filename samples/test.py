@@ -4,8 +4,8 @@ from pathlib import Path
 from python_odt_template import ODTTemplate
 from python_odt_template.jinja import enable_markdown
 from python_odt_template.jinja import get_odt_renderer
-from python_odt_template.libreoffice import LibreOffice
-from python_odt_template.libreoffice import UnoConvert
+from python_odt_template.libreoffice import libreoffice
+from python_odt_template.libreoffice import unoconvert
 
 odt_renderer = get_odt_renderer(media_path="inputs")
 outputs_dir = Path("outputs")
@@ -40,7 +40,7 @@ with ODTTemplate("inputs/simple_template.odt") as template, enable_markdown(temp
         context={"document": document, "countries": countries},
     )
     template.pack(outputs_dir / "simple_template_rendered.odt")
-    LibreOffice().convert(outputs_dir / "simple_template_rendered.odt", outputs_dir)
+    libreoffice.convert(outputs_dir / "simple_template_rendered.odt", outputs_dir)
 
 with ODTTemplate("inputs/template.odt") as template:
     odt_renderer.render(
@@ -50,4 +50,4 @@ with ODTTemplate("inputs/template.odt") as template:
     template.pack(
         outputs_dir / "template_rendered.odt",
     )
-    UnoConvert().convert(outputs_dir / "template_rendered.odt", outputs_dir)
+    unoconvert.convert(outputs_dir / "template_rendered.odt", outputs_dir)

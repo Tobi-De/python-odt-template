@@ -79,3 +79,7 @@ class UnoConvert(LOConverter):
             "--host",
             self.host,
         )
+
+
+libreoffice = LibreOffice()
+unoconvert = UnoConvert()
