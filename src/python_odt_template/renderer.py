@@ -127,7 +127,7 @@ class ODTRenderer:
             content = tag.childNodes[0].data.strip()
             is_block = self._is_block_tag(content)
 
-            count_node_decendant_tags(tag.parentNode, is_block)
+            count_node_descendant_tags(tag.parentNode, is_block)
 
     def _prepare_tags(self, document: Document):
         """Here we search for every field node present in xml_document.
@@ -259,24 +259,6 @@ class ODTRenderer:
 
         return xml_text
 
-    def _replace_images(self, xml_document: Document, media_writer: Callable[[Path, str], str]):
-        frames = xml_document.getElementsByTagName("draw:frame")
-
-        for frame in frames:
-            if not frame.hasChildNodes():
-                continue
-
-            image = Path(frame.getAttribute("draw:name"))
-
-            if not (image.exists() and image.is_file()):
-                logger.debug("Image file not found", extra={"image": image})
-                continue
-
-            image_node = frame.childNodes[0]
-            media_path = media_writer(image, image.stem)
-            frame.setAttribute("draw:name", image.stem)
-            image_node.setAttribute("xlink:href", media_path)
-
     def render_xml(self, xml_document: Document, context: dict) -> Document:
         self._prepare_tags(xml_document)
         xml_source = xml_document.toxml()
@@ -296,14 +278,37 @@ class ODTRenderer:
 
     def render(self, template: ODTTemplate, context: dict) -> None:
         rendered_content = self.render_xml(template.content, context)
-        self._replace_images(rendered_content, media_writer=template.add_image)
+        render_images(rendered_content, image_writer=template.add_image)
         template.content.getElementsByTagName("office:document-content")[0].replaceChild(
             rendered_content.getElementsByTagName("office:body")[0],
             template.content.getElementsByTagName("office:body")[0],
         )
 
         template.styles = self.render_xml(template.styles, context)
-        self._replace_images(template.styles, media_writer=template.add_image)
+
+
+def render_images(xml_document: Document, image_writer: Callable[[Path, str], str]):
+    """
+    This function identifies all image frames in the provided XML document and updates their 'href' attributes.
+    The function uses the image's path as the name and employs the ODT file's image writer to save the image and retrieve its path.
+    This path is then set as the 'href' attribute for the corresponding image frame in the XML document.
+    """
+    frames = xml_document.getElementsByTagName("draw:frame")
+
+    for frame in frames:
+        if not frame.hasChildNodes():
+            continue
+
+        image = Path(frame.getAttribute("draw:name"))
+
+        if not (image.exists() and image.is_file()):
+            logger.debug("Image file not found", extra={"image": image})
+            continue
+
+        image_node = frame.childNodes[0]
+        media_path = image_writer(image, image.stem)
+        frame.setAttribute("draw:name", image.stem)
+        image_node.setAttribute("xlink:href", media_path)
 
 
 def get_node_parent_of_name(node: Node, name: str) -> Node | str:
@@ -321,11 +326,11 @@ def get_node_parent_of_name(node: Node, name: str) -> Node | str:
     return get_node_parent_of_name(node.parentNode, name)
 
 
-def count_node_decendant_tags(node: Node, is_block_tag: bool):
+def count_node_descendant_tags(node: Node, is_block_tag: bool):
     """
-    Increate *node* tags_count property and block_count property
+    Increment *node* tags_count property and block_count property
     if *is_block_tag* is True. Otherwise increase *var_count* property.
-    This is also done recursevely for this node parents.
+    This is also done recursively for this node parents.
     """
     if not node:
         return
@@ -338,4 +343,4 @@ def count_node_decendant_tags(node: Node, is_block_tag: bool):
     node.tags_count += 1
     count_var_name = "block_count" if is_block_tag else "var_count"
     setattr(node, count_var_name, getattr(node, count_var_name) + 1)
-    count_node_decendant_tags(node.parentNode, is_block_tag)
+    count_node_descendant_tags(node.parentNode, is_block_tag)
