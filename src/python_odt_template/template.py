@@ -17,7 +17,7 @@ from markupsafe import Markup
 from python_odt_template.markdown_map import transform_map
 
 if TYPE_CHECKING:
-    from xml.dom.minidom import Node
+    from xml.dom.minidom import Node, Document
 
 
 class ODTTemplate:
@@ -30,6 +30,12 @@ class ODTTemplate:
         self.content = parseString(self.read_file("content.xml"))
         self.styles = parseString(self.read_file("styles.xml"))
         self.manifest = parseString(self.read_file("META-INF/manifest.xml"))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.temp_dir.cleanup()
 
     def write_file(self, name: str, content: str) -> None:
         with open(self.temp_dir.name + "/" + name, "w") as file:
@@ -75,150 +81,163 @@ class ODTTemplate:
                     )
         Path(target).write_bytes(zip_file.getvalue())
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.temp_dir.cleanup()
-
-    def get_style_by_name(self, style_name: str) -> None | Node:
-        """
-        Search in <office:automatic-styles> for style_name.
-        Return None if style_name is not found. Otherwise
-        return the style node
-        """
-
-        auto_styles = self.content.getElementsByTagName("office:automatic-styles")[0]
-
-        if not auto_styles.hasChildNodes():
+    def get_style_node(self, style_name, styles=None):
+        styles = styles or self.get_automatic_styles()
+        if not styles:
             return None
 
-        for style_node in auto_styles.childNodes:
-            if style_node.hasAttribute("style:name") and (style_node.getAttribute("style:name") == style_name):
-                return style_node
+        for style in styles.childNodes:
+            if hasattr(style, "getAttribute"):
+                if style.getAttribute("style:name") == style_name:
+                    return style
 
-        return None
+    def get_office_styles(self) -> Node | None:
+        office_styles = self.content.getElementsByTagName("office:styles")
+        if not office_styles:
+            return None
 
-    def insert_style_in_content(self, style_name: str, attributes: dict | None = None, **style_properties) -> Node:
+        return office_styles[0]
+
+    def get_automatic_styles(self) -> Node | None:
+        automatic_styles = self.content.getElementsByTagName("office:automatic-styles")
+        if not automatic_styles:
+            return None
+
+        return automatic_styles[0]
+
+    def insert_style_in_automatic_styles(self, name: str, attrs: dict | None = None, **props):
+        attrs = attrs or {}
+        auto_styles = self.get_automatic_styles()
+        if not auto_styles:
+            return
+
+        style = self.content.createElement("style:style")
+        style.setAttribute("style:name", name)
+        style.setAttribute("style:family", "text")
+        style.setAttribute("style:parent-style-name", "Standard")
+
+        for name, value in attrs.items():
+            style.setAttribute("style:{}".format(name), value)
+
+        if props:
+            style_props = self.content.createElement("style:text-properties")
+            for prop, value in props.items():
+                style_props.setAttribute(prop, value)
+
+            style.appendChild(style_props)
+
+        return auto_styles.appendChild(style)
+
+    def insert_markdown_code_style(self):
+        # Creates a monospace style to use for <code> tags. This new styles
+        # inherits from 'Preformatted_20_Text'.
+        preformatted = self.get_style_node("Preformatted_20_Text", self.get_office_styles())
+        if not preformatted:
+            return
+
+        text_props = preformatted.getElementsByTagName("style:text-properties")[0]
+        style_props = {
+            "style:font-name": "",
+            "fo:font-family": "",
+            "style:font-family-generic": "",
+            "style:font-pitch": "",
+        }
+
+        for style in style_props.keys():
+            style_props.update(**{style: text_props.getAttribute(style)})
+
+        self.insert_style_in_automatic_styles("markdown_code", {}, **style_props)
+
+    def markdown_filter(self, value: str) -> str:
         """
-        Insert a new style into content.xml's <office:automatic-styles> node.
-        Returns a reference to the newly created node
+        Converts markdown value into an ODT formatted text.
         """
+        self.insert_markdown_code_style()
+        html = markdown(value)
+        html_object = parseString("<html>{}</html>".format(html.encode("ascii", "xmlcharrefreplace")))
 
-        auto_styles = self.content.getElementsByTagName("office:automatic-styles")[0]
-        style_node = self.content.createElement("style:style")
+        # Transform every known HTML tags to odt
+        for tagname, transform in transform_map.items():
+            html_tags = html_object.getElementsByTagName(tagname)
+            for tag in html_tags:
+                self.html_tag_to_odt(html_object, tag, transform)
 
-        style_node.setAttribute("style:name", style_name)
-        style_node.setAttribute("style:family", "text")
-        style_node.setAttribute("style:parent-style-name", "Standard")
+        def _node_to_str(node):
+            result = node.toxml()
 
-        if attributes:
-            for k, v in attributes.items():
-                style_node.setAttribute(f"style:{k}", v)
+            # Convert single linebreaks in preformatted nodes to text:line-break
+            if node.__class__.__name__ != "Text" and node.getAttribute("text:style-name") == "Preformatted_20_Text":
+                result = result.replace("\n", "<text:line-break/>")
 
-        if style_properties:
-            style_prop = self.content.createElement("style:text-properties")
-            for k, v in style_properties.items():
-                style_prop.setAttribute(k, v)
+            # All double linebreaks should be converted to an empty paragraph
+            return result.replace("\n\n", '<text:p text:style-name="Standard"/>')
 
-            style_node.appendChild(style_prop)
+        str_nodes = (_node_to_str(node) for node in html_object.getElementsByTagName("html")[0].childNodes)
+        return Markup("".join(str_nodes))
 
-        return auto_styles.appendChild(style_node)
-
-    def markdown_filter(self, markdown_text: str) -> str:
+    def html_tag_to_odt(self, html: Document, tag: Node, transform: dict):
         """
-        Convert a markdown text into a ODT formated text
+        Replace tag in html with a new odt tag created from the instructions
+        in transform dictionary.
         """
+        styles_cache = {}
+        odt_tag = html.createElement(transform["replace_with"])
 
-        if not isinstance(markdown_text, str):
-            return ""
+        # First lets work with the content
+        if tag.hasChildNodes():
+            # Only when there's a double linebreak separating list elements,
+            # markdown2 wraps the content of the element inside a <p> element.
+            # In ODT we should always encapsulate list content in a single paragraph.
+            # Here we create the container paragraph in case markdown didn't.
+            if tag.localName == "li" and tag.childNodes[0].localName != "p":
+                container = html.createElement("text:p")
+                odt_tag.appendChild(container)
+            elif tag.localName == "code":
 
-        styles_cache = {}  # cache styles searching
-        html_text = markdown(markdown_text)
-        encoded = html_text.encode("ascii", "xmlcharrefreplace")
-        if isinstance(encoded, bytes):
-            # In PY3 bytes-like object needs convert to str
-            encoded = encoded.decode("ascii")
-        xml_object = parseString(f"<html>{encoded}</html>")
-
-        # Transform HTML tags as specified in transform_map
-        # Some tags may require extra attributes in ODT.
-        # Additional attributes are indicated in the 'attributes' property
-
-        for tag in transform_map:
-            html_nodes = xml_object.getElementsByTagName(tag)
-            for html_node in html_nodes:
-                odt_node = xml_object.createElement(transform_map[tag]["replace_with"])
-
-                # Transfer child nodes
-                if html_node.hasChildNodes():
-                    # We can't directly insert text into a text:list-item element.
-                    # The content of the item most be wrapped inside a container
-                    # like text:p. When there's not a double linebreak separating
-                    # list elements, markdown2 creates <li> elements without wraping
-                    # their contents inside a container. Here we automatically create
-                    # the container if one was not created by markdown2.
-                    if tag == "li" and html_node.childNodes[0].localName != "p":
-                        container = xml_object.createElement("text:p")
-                        odt_node.appendChild(container)
-                    elif tag == "code":
-
-                        def traverse_preformated(node):
-                            if node.hasChildNodes():
-                                for n in node.childNodes:
-                                    traverse_preformated(n)
-                            else:
-                                container = xml_object.createElement("text:span")
-                                for text in re.split("(\n)", node.nodeValue.lstrip("\n")):
-                                    if text == "\n":
-                                        container.appendChild(xml_object.createElement("text:line-break"))
-                                    else:
-                                        container.appendChild(xml_object.createTextNode(text))
-
-                                node.parentNode.replaceChild(container, node)
-
-                        traverse_preformated(html_node)
-                        container = odt_node
+                def traverse_preformated(node):
+                    if node.hasChildNodes():
+                        for n in node.childNodes:
+                            traverse_preformated(n)
                     else:
-                        container = odt_node
+                        container = html.createElement("text:span")
+                        for text in re.split("(\n)", node.nodeValue.lstrip("\n")):
+                            if text == "\n":
+                                container.appendChild(html.createElement("text:line-break"))
+                            else:
+                                container.appendChild(html.createTextNode(text))
 
-                    for child_node in html_node.childNodes:
-                        container.appendChild(child_node.cloneNode(True))
+                        node.parentNode.replaceChild(container, node)
 
-                # Add style-attributes defined in transform_map
-                if "style_attributes" in transform_map[tag]:
-                    for k, v in transform_map[tag]["style_attributes"].items():
-                        odt_node.setAttribute(f"text:{k}", v)
+                traverse_preformated(tag)
+                container = odt_tag
+            else:
+                container = odt_tag
 
-                # Add defined attributes
-                if "attributes" in transform_map[tag]:
-                    for k, v in transform_map[tag]["attributes"].items():
-                        odt_node.setAttribute(k, v)
+            # Insert html tag content (actually a group of child nodes)
+            for child in tag.childNodes:
+                container.appendChild(child.cloneNode(True))
 
-                    # copy original href attribute in <a> tag
-                    if tag == "a" and html_node.hasAttribute("href"):
-                        odt_node.setAttribute("xlink:href", html_node.getAttribute("href"))
+        # Now transform tag attributes
+        if "style_attributes" in transform:
+            for style, attrs in transform["style_attributes"].items():
+                odt_tag.setAttribute("text:{}".format(style), attrs)
 
-                # Does the node need to create an style?
-                if "style" in transform_map[tag]:
-                    name = transform_map[tag]["style"]["name"]
-                    if name not in styles_cache:
-                        style_node = self.get_style_by_name(name)
+        if "attributes" in transform:
+            for name, value in transform["attributes"].items():
+                odt_tag.setAttribute(name, value)
 
-                        if style_node is None:
-                            # Create and cache the style node
-                            style_node = self.insert_style_in_content(
-                                name,
-                                transform_map[tag]["style"].get("attributes", None),
-                                **transform_map[tag]["style"]["properties"],
-                            )
-                            styles_cache[name] = style_node
+            # Special handling of <a> tags and their href attribute
+            if tag.localName == "a" and tag.hasAttribute("href"):
+                odt_tag.setAttribute("xlink:href", tag.getAttribute("href"))
 
-                html_node.parentNode.replaceChild(odt_node, html_node)
+        # Does we need to create a style for displaying this tag?
+        if "style" in transform and (not transform["style"]["name"] in styles_cache):
+            style_name = transform["style"]["name"]
+            style = self.get_style_node(style_name)
+            if not style:
+                style = self.insert_style_in_automatic_styles(
+                    style_name, transform["style"].get("attributes", {}), **transform["style"]["properties"]
+                )
+                styles_cache[style_name] = style
 
-        odttext = "".join(
-            node_as_str
-            for node_as_str in (node.toxml() for node in xml_object.getElementsByTagName("html")[0].childNodes)
-        )
-
-        return Markup(odttext)
+        tag.parentNode.replaceChild(odt_tag, tag)
