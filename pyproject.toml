@@ -38,7 +38,6 @@ dynamic = [
 ]
 dependencies = [
   "defusedxml",
-  "markdown2",
 ]
 
 optional-dependencies.django = [
@@ -46,6 +45,9 @@ optional-dependencies.django = [
 ]
 optional-dependencies.jinja = [
   "jinja2",
+]
+optional-dependencies.md = [
+  "markdown2",
 ]
 urls.Documentation = "https://github.com/Tobi-De/python-odt-template#readme"
 urls.Issues = "https://github.com/Tobi-De/python-odt-template/issues"
@@ -58,10 +60,10 @@ path = "src/python_odt_template/__about__.py"
 features = [
   "django",
   "jinja",
+  "md"
 ]
 dependencies = [
   "ipython",
-  "markdown2",
 ]
 
 [tool.hatch.envs.types]

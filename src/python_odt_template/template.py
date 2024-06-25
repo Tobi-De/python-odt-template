@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from defusedxml.minidom import parseString
-from markdown2 import markdown
 from markupsafe import Markup
 from python_odt_template.markdown_map import transform_map
 
@@ -152,6 +151,8 @@ class ODTTemplate:
         """
         Converts markdown value into an ODT formatted text.
         """
+        from markdown2 import markdown
+
         self.insert_markdown_code_style()
         html = markdown(value)
         html_object = parseString("<html>{}</html>".format(html.encode("ascii", "xmlcharrefreplace")))
@@ -194,10 +195,10 @@ class ODTTemplate:
                 odt_tag.appendChild(container)
             elif tag.localName == "code":
 
-                def traverse_preformated(node):
+                def traverse_preformatted(node):
                     if node.hasChildNodes():
                         for n in node.childNodes:
-                            traverse_preformated(n)
+                            traverse_preformatted(n)
                     else:
                         container = html.createElement("text:span")
                         for text in re.split("(\n)", node.nodeValue.lstrip("\n")):
@@ -208,7 +209,7 @@ class ODTTemplate:
 
                         node.parentNode.replaceChild(container, node)
 
-                traverse_preformated(tag)
+                traverse_preformatted(tag)
                 container = odt_tag
             else:
                 container = odt_tag
