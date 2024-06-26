@@ -1,5 +1,7 @@
 from python_odt_template.renderer import ODTRenderer
 
+from .filters import odt_markdown
+from .filters import pad_string
 from django import template
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -17,6 +19,10 @@ def image(value):
         msg = "You must add a least one directory to STATICFILES_DIRS in your settings.py file"
         raise ImproperlyConfigured(msg) from e
     return static_path / value
+
+
+register.filter("odt_markdown", odt_markdown)
+register.filter("pad", pad_string)
 
 
 def _render(template_str: str, context: dict) -> str:

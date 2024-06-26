@@ -183,7 +183,7 @@ class ODTRenderer:
             is_block = self._is_block_tag(content)
             scale_to = tag.getAttribute("text:description").strip().lower()
 
-            if content.lower().find("|markdown") > 0:
+            if content.lower().find("|odt_markdown") > 0:
                 # Take whole paragraph when handling a markdown field
                 scale_to = "text:p"
 

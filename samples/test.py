@@ -2,7 +2,6 @@ import datetime as dt
 from pathlib import Path
 
 from python_odt_template import ODTTemplate
-from python_odt_template.jinja import enable_markdown
 from python_odt_template.jinja import get_odt_renderer
 from python_odt_template.libreoffice import libreoffice
 from python_odt_template.libreoffice import unoconvert
@@ -34,7 +33,8 @@ countries = [
     {"country": "Mexico", "capital": "MExico City", "cities": ["puebla", "cancun"]},
 ]
 
-with ODTTemplate("inputs/simple_template.odt") as template, enable_markdown(template.markdown_filter):
+with ODTTemplate("inputs/simple_template.odt") as template:
+    # template.insert_markdown_style(include_code=True)
     odt_renderer.render(
         template,
         context={"document": document, "countries": countries},

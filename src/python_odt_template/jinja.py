@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
 from pathlib import Path
 
 from jinja2 import Environment
@@ -8,7 +7,10 @@ from jinja2 import Undefined
 from markupsafe import Markup
 from python_odt_template.renderer import ODTRenderer
 
-__all__ = ("get_odt_renderer", "enable_markdown")
+from .filters import odt_markdown
+from .filters import pad_string
+
+__all__ = "get_odt_renderer"
 
 
 class UndefinedSilently(Undefined):
@@ -63,6 +65,7 @@ def get_odt_renderer(media_path: str | Path, env: Environment = environment) -> 
     env.filters["pad"] = pad_string
     env.globals["SafeValue"] = Markup
     env.filters["image"] = image_filter
+    env.filters["odt_markdown"] = odt_markdown
     return ODTRenderer(
         block_end_string=env.block_end_string,
         block_start_string=env.block_start_string,
@@ -70,17 +73,3 @@ def get_odt_renderer(media_path: str | Path, env: Environment = environment) -> 
         variable_start_string=env.variable_start_string,
         render_func=render,
     )
-
-
-@contextmanager
-def enable_markdown(markdown_filter: callable, env: Environment = environment):
-    try:
-        env.filters["markdown"] = markdown_filter
-        yield
-    finally:
-        env.filters.pop("markdown")
-
-
-def pad_string(value, length=5):
-    value = str(value)
-    return value.zfill(length)
