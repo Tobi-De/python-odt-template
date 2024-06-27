@@ -70,12 +70,19 @@ class ODTTemplate:
         self.write_file("META-INF/manifest.xml", self.manifest.toxml())
 
         with zipfile.ZipFile(zip_file, "w", zipfile.ZIP_DEFLATED) as zipdoc:
+            # Add the mimetype file first with no compression
+            mimetype_path = os.path.join(self.temp_dir.name, "mimetype")
+            if os.path.exists(mimetype_path):
+                zipdoc.write(mimetype_path, "mimetype", compress_type=zipfile.ZIP_STORED)
+
             for root, _, files in os.walk(self.temp_dir.name):
                 for file in files:
-                    zipdoc.write(
-                        os.path.join(root, file),
-                        arcname=os.path.relpath(os.path.join(root, file), self.temp_dir.name),
-                    )
+                    file_path = os.path.join(root, file)
+                    if file_path != mimetype_path:
+                        zipdoc.write(
+                            file_path,
+                            arcname=os.path.relpath(os.path.join(root, file), self.temp_dir.name),
+                        )
         Path(target).write_bytes(zip_file.getvalue())
 
     def get_style_node(self, style_name, styles=None):
