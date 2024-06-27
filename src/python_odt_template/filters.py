@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import re
-
 from typing import TYPE_CHECKING
+
 from defusedxml.minidom import parseString
 from markupsafe import Markup
 from python_odt_template.markdown_map import transform_map
@@ -31,17 +31,7 @@ def odt_markdown(value: str) -> str:
         for tag in html_tags:
             _html_tag_to_odt(html_object, tag, transform)
 
-    def _node_to_str(node):
-        result = node.toxml()
-
-        # Convert single linebreaks in preformatted nodes to text:line-break
-        if node.__class__.__name__ != "Text" and node.getAttribute("text:style-name") == "Preformatted_20_Text":
-            result = result.replace("\n", "<text:line-break/>")
-
-        # All double linebreaks should be converted to an empty paragraph
-        return result.replace("\n\n", '<text:p text:style-name="Standard"/>')
-
-    str_nodes = (_node_to_str(node) for node in html_object.getElementsByTagName("html")[0].childNodes)
+    str_nodes = (node.toxml() for node in html_object.getElementsByTagName("html")[0].childNodes)
     return Markup("".join(str_nodes))
 
 
