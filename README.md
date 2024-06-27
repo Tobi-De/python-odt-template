@@ -8,6 +8,8 @@
 > [!IMPORTANT]
 > This package currently contains minimal features and is a work-in-progress
 
+Render ODT files using Jinja2 or the Django templates Language, with support for converting documents to PDF via the LibreOffice CLI. 
+
 ## Table of Contents
 
 - [python-odt-template](#python-odt-template)
@@ -28,13 +30,21 @@ pip install python-odt-template
 
 ## Usage
 
+`python-odt-template` supports basic tags and control flow from Django or Jinja2, enabling variable printing and simple logic. However, advanced features like `extends`, `include`, and `block` are not supported. Directly mixing tags with text may lead to invalid ODT templates. Instead, we recommend using LibreOffice Writer's visual fields for dynamic content insertion. To do this, navigate to Insert > Fields > Other... (or press Ctrl+F2), select the Functions tab, choose Input field, and insert your code in the dialog that appears. This method supports simple control flow for dynamic content.
+
+Additionally, `python-odt-template` introduces an `image` tag for both Jinja2 and Django, allowing image insertion by replacing a placeholder image in your document. Use the tag (e.g., `{{ company_logo|image }}`) and provide the corresponding image path in the context (`company_logo`). For Django, the image path is resolved using the first entry in `STATICFILES_DIRS`. For Jinja2, specify a `media_path` when creating the renderer to set the base path for images.
+
+> [!IMPORTANT]
+> For now, you can get more detailed information at the Secretary project's readme at https://github.com/christopher-ramirez/secretary.
+
+
 ### Jinja2
 
 ```python
 from python_odt_template import ODTTemplate
 from python_odt_template.jinja import enable_markdown
 from python_odt_template.jinja import get_odt_renderer
-from python_odt_template.libreoffice import convert_to_pdf
+from python_odt_template.libreoffice import libreoffice
 
 odt_renderer = get_odt_renderer(media_path="inputs")
 
@@ -44,7 +54,7 @@ with ODTTemplate("inputs/simple_template.odt") as template:
         context={"document": document, "countries": countries},
     )
     template.pack("simple_template_rendered.odt")
-    convert_to_pdf("simple_template_rendered.odt", "outputs")
+    libreoffice.convert("simple_template_rendered.odt", "outputs")
 ```
 
 ### Django
@@ -84,7 +94,7 @@ def render_odt(request):
             {"image": "writer.png"},
         )
         template.pack("template_rendered.odt")
-        convert_to_pdf("template_rendered.odt", "outputs")
+        libreoffice.convert("template_rendered.odt", "outputs")
     return FileResponse(
         open("outputs/template_rendered.pdf", "rb"), as_attachment=True, filename="template_rendered.pdf"
     )
