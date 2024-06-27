@@ -34,7 +34,7 @@ pip install python-odt-template
 
 Additionally, `python-odt-template` introduces an `image` tag for both Jinja2 and Django, allowing image insertion by replacing a placeholder image in your document. Use the tag (e.g., `{{ company_logo|image }}`) and provide the corresponding image path in the context (`company_logo`). For Django, the image path is resolved using the first entry in `STATICFILES_DIRS`. For Jinja2, specify a `media_path` when creating the renderer to set the base path for images.
 
-> [!IMPORTANT]
+> [!NOTE]
 > For now, you can get more detailed information at the Secretary project's readme at https://github.com/christopher-ramirez/secretary.
 
 
